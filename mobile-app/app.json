@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Billr Mobile",
+    "slug": "billr-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "android": {
+      "package": "com.billr.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.billr.mobile"
+    },
+    "extra": {
+      "apiBaseUrl": "http://10.0.2.2:4000"
+    }
+  }
+}

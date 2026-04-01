@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "customers" ALTER COLUMN "phone" DROP NOT NULL,
+ALTER COLUMN "address" DROP NOT NULL;
+
+-- AlterTable
+ALTER TABLE "products" ALTER COLUMN "name" DROP NOT NULL,
+ALTER COLUMN "stock" SET DEFAULT 0;

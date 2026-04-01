@@ -1,0 +1,10 @@
+ALTER TYPE "UserRole" RENAME VALUE 'SALESMAN' TO 'WORKER';
+
+ALTER TABLE "users"
+  ALTER COLUMN "phone" DROP NOT NULL;
+
+ALTER TABLE "users"
+  ADD COLUMN "email" TEXT,
+  ADD COLUMN "is_active" BOOLEAN NOT NULL DEFAULT true;
+
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");

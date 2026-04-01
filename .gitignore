@@ -1,0 +1,8 @@
+node_modules
+.env
+dist
+coverage
+*.log
+prisma/dev.db
+pgdata
+invoice-preview-test.pdf
