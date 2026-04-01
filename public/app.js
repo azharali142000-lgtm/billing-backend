@@ -155,6 +155,15 @@ let invoiceDraft = {
   roundOff: false
 };
 
+function resetLoginFields() {
+  if (identifierInput) {
+    identifierInput.value = "";
+  }
+  if (passwordInput) {
+    passwordInput.value = "";
+  }
+}
+
 function showMessage(message, isError = false) {
   globalMessage.textContent = message;
   globalMessage.classList.remove("hidden", "error");
@@ -2250,6 +2259,7 @@ function logout() {
   clearMessage();
   renderVisibility();
   authMessage.textContent = "";
+  resetLoginFields();
 }
 
 function handleAppBackNavigation() {
@@ -2680,6 +2690,7 @@ invoiceActionButtons().forEach((button) => {
 
 applyTheme(state.theme);
 renderVisibility();
+resetLoginFields();
 replaceNavState();
 selectScreen(state.activeScreen, { skipHistory: true });
 

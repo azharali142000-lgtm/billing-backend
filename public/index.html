@@ -23,18 +23,18 @@
           </div>
         </div>
 
-        <form id="loginForm" class="auth-card">
+        <form id="loginForm" class="auth-card" autocomplete="off">
           <div class="section-title">
             <p class="mini-label">Secure Login</p>
             <h2>Sign in to Billr</h2>
           </div>
           <label>
             <span>Phone or Email</span>
-            <input id="identifier" type="text" value="9999999999" required />
+            <input id="identifier" type="text" value="" autocomplete="off" required />
           </label>
           <label>
             <span>Password</span>
-            <input id="password" type="password" value="Admin@12345" required />
+            <input id="password" type="password" value="" autocomplete="new-password" required />
           </label>
           <button type="submit" class="primary-btn full-btn">Continue</button>
           <p class="support-text">Cloud OTP flow can be added next on top of this live backend.</p>
