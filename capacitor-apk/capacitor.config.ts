@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: "Billr",
   webDir: "www",
   server: {
-    url: "https://app.billr.example",
-    cleartext: false,
+    url: "https://billing-backend-2v0w.onrender.com",
+    cleartext: true,
     androidScheme: "https"
   },
   plugins: {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Billr</string>
+    <string name="title_activity_main">Billr</string>
+    <string name="package_name">com.billr.apk</string>
+    <string name="custom_url_scheme">com.billr.apk</string>
+</resources>

@@ -6,3 +6,4 @@ coverage
 prisma/dev.db
 pgdata
 invoice-preview-test.pdf
+capacitor-apk/.gradle-user
