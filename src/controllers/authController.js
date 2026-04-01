@@ -20,6 +20,9 @@ function normalizeRole(role) {
   }
 
   const normalized = String(role).trim().toUpperCase();
+  if (normalized === "STAFF") {
+    return "WORKER";
+  }
   return ["ADMIN", "WORKER"].includes(normalized) ? normalized : null;
 }
 
@@ -65,7 +68,7 @@ const register = asyncHandler(async (req, res) => {
 
   const desiredRole = normalizeRole(role || "WORKER");
   if (!desiredRole) {
-    throw new ApiError(400, "role must be either admin or worker");
+    throw new ApiError(400, "role must be either admin or staff");
   }
 
   const userCount = await prisma.user.count();
@@ -402,7 +405,7 @@ const createWorker = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: "Worker created successfully",
+    message: "Staff created successfully",
     data: serializeUser(worker)
   });
 });
@@ -412,7 +415,7 @@ const resetWorkerPassword = asyncHandler(async (req, res) => {
   const { newPassword } = req.body;
 
   if (!Number.isInteger(workerId) || !newPassword) {
-    throw new ApiError(400, "Valid worker id and newPassword are required");
+    throw new ApiError(400, "Valid staff id and newPassword are required");
   }
 
   if (String(newPassword).length < 6) {
@@ -424,7 +427,7 @@ const resetWorkerPassword = asyncHandler(async (req, res) => {
   });
 
   if (!worker || worker.role !== "WORKER") {
-    throw new ApiError(404, "Worker not found");
+    throw new ApiError(404, "Staff not found");
   }
 
   await prisma.user.update({
@@ -436,7 +439,7 @@ const resetWorkerPassword = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: "Worker password reset successfully"
+    message: "Staff password reset successfully"
   });
 });
 
@@ -444,7 +447,7 @@ const disableWorker = asyncHandler(async (req, res) => {
   const workerId = Number(req.params.id);
 
   if (!Number.isInteger(workerId)) {
-    throw new ApiError(400, "Valid worker id is required");
+    throw new ApiError(400, "Valid staff id is required");
   }
 
   const worker = await prisma.user.findUnique({
@@ -452,7 +455,7 @@ const disableWorker = asyncHandler(async (req, res) => {
   });
 
   if (!worker || worker.role !== "WORKER") {
-    throw new ApiError(404, "Worker not found");
+    throw new ApiError(404, "Staff not found");
   }
 
   const updatedWorker = await prisma.user.update({
@@ -464,7 +467,7 @@ const disableWorker = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: "Worker disabled successfully",
+    message: "Staff disabled successfully",
     data: serializeUser(updatedWorker)
   });
 });

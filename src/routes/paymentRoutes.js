@@ -6,7 +6,7 @@ const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-router.get("/", authenticate, authorize("admin", "worker"), listPayments);
-router.post("/", authenticate, authorize("admin", "worker"), recordPayment);
+router.get("/", authenticate, authorize("admin", "staff"), listPayments);
+router.post("/", authenticate, authorize("admin", "staff"), recordPayment);
 
 module.exports = router;

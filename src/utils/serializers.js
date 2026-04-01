@@ -1,10 +1,11 @@
 function serializeUser(user) {
+  const normalizedRole = String(user.role || "").toLowerCase();
   return {
     id: user.id,
     name: user.name,
     phone: user.phone,
     email: user.email,
-    role: user.role.toLowerCase(),
+    role: normalizedRole === "worker" ? "staff" : normalizedRole,
     isActive: user.isActive,
     createdAt: user.createdAt
   };

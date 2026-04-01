@@ -12,10 +12,10 @@ const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-router.get("/", authenticate, authorize("admin", "worker"), listInvoices);
-router.post("/", authenticate, authorize("admin", "worker"), createInvoice);
+router.get("/", authenticate, authorize("admin", "staff"), listInvoices);
+router.post("/", authenticate, authorize("admin", "staff"), createInvoice);
 router.put("/:id", authenticate, authorize("admin"), updateInvoice);
-router.get("/:id/pdf", authenticate, authorize("admin", "worker"), downloadInvoicePdf);
+router.get("/:id/pdf", authenticate, authorize("admin", "staff"), downloadInvoicePdf);
 router.patch("/:id/cancel", authenticate, authorize("admin"), cancelInvoice);
 
 module.exports = router;

@@ -372,7 +372,7 @@ function isAdmin() {
 }
 
 function isWorker() {
-  return normalizeRole(state.user?.role) === "worker";
+  return normalizeRole(state.user?.role) === "staff";
 }
 
 function userLoginId(user = state.user) {
@@ -387,7 +387,11 @@ function normalizeRole(role) {
   if (!role) {
     return "-";
   }
-  return String(role).toLowerCase() === "salesman" ? "worker" : String(role).toLowerCase();
+  const normalized = String(role).toLowerCase();
+  if (normalized === "salesman" || normalized === "worker") {
+    return "staff";
+  }
+  return normalized;
 }
 
 function setSyncState(text) {
@@ -1510,7 +1514,7 @@ function renderMoreScreen() {
           `
         )
         .join("")
-    : `<article class="worker-row"><div class="ledger-name">No workers added yet.</div></article>`;
+    : `<article class="worker-row"><div class="ledger-name">No staff added yet.</div></article>`;
 
   workerList.querySelectorAll("[data-worker-action]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1523,7 +1527,7 @@ function renderMoreScreen() {
         return;
       }
 
-      if (!window.confirm("Disable this worker account?")) {
+      if (!window.confirm("Disable this staff account?")) {
         return;
       }
 
@@ -1532,7 +1536,7 @@ function renderMoreScreen() {
           method: "PATCH",
           headers: authHeaders()
         });
-        showMessage("Worker disabled successfully.");
+        showMessage("Staff disabled successfully.");
         await loadDashboard();
       } catch (error) {
         showMessage(error.message, true);
@@ -2064,13 +2068,13 @@ function modalFieldHtml(type) {
 
     return `
       <label>
-        <span>Worker</span>
+        <span>Staff</span>
         <select id="modalResetWorkerId">
           ${workerOptions}
         </select>
       </label>
       <label><span>New Password</span><input id="modalResetWorkerPassword" type="password" minlength="6" required /></label>
-      <p class="support-text">Admin can reset a worker password without the old password.</p>
+      <p class="support-text">Admin can reset a staff password without the old password.</p>
     `;
   }
 
@@ -2101,8 +2105,8 @@ function openModal(type, meta = {}) {
     product: { label: "Inventory", title: meta.product ? "Edit Product" : "New Product" },
     payment: { label: "Collections", title: "Record Payment" },
     "change-password": { label: "Settings", title: "Change Password" },
-    worker: { label: "Admin Controls", title: "Add Worker" },
-    "reset-worker-password": { label: "Admin Controls", title: "Reset Worker Password" }
+    worker: { label: "Admin Controls", title: "Add Staff" },
+    "reset-worker-password": { label: "Admin Controls", title: "Reset Staff Password" }
   }[type];
 
   modalLabel.textContent = config.label;
@@ -2170,7 +2174,7 @@ function openModal(type, meta = {}) {
             password: document.getElementById("modalWorkerPassword").value
           })
         });
-        showMessage(`Worker ${response.data.name} created.`);
+        showMessage(`Staff ${response.data.name} created.`);
       } else if (type === "reset-worker-password") {
         const resetWorkerId = Number(document.getElementById("modalResetWorkerId")?.value || meta.workerId);
         await apiRequest(`/api/auth/workers/${resetWorkerId}/reset-password`, {
@@ -2181,7 +2185,7 @@ function openModal(type, meta = {}) {
           })
         });
         pendingResetWorkerId = null;
-        showMessage("Worker password reset successfully.");
+        showMessage("Staff password reset successfully.");
       } else {
         const response = await apiRequest("/api/payments", {
           method: "POST",
@@ -2392,7 +2396,7 @@ settingsResetWorkerBtn?.addEventListener("click", () => {
   logClick("settings-reset-worker");
   closeSettingsMenu();
   if (!state.workers.some((worker) => worker.isActive)) {
-    showMessage("No active workers available to reset.", true);
+    showMessage("No active staff available to reset.", true);
     return;
   }
   pendingResetWorkerId = state.workers.find((worker) => worker.isActive)?.id || null;
