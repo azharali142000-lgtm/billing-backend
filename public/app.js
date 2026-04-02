@@ -131,6 +131,7 @@ const customerLedgerInvoiceList = document.getElementById("customerLedgerInvoice
 const productSheet = document.getElementById("productSheet");
 const closeProductSheetBtn = document.getElementById("closeProductSheetBtn");
 const productSheetSearchInput = document.getElementById("productSheetSearchInput");
+const addProductFromSheetBtn = document.getElementById("addProductFromSheetBtn");
 const productSheetList = document.getElementById("productSheetList");
 const productInsights = document.getElementById("productInsights");
 const productSheetDoneBtn = document.getElementById("productSheetDoneBtn");
@@ -1872,6 +1873,14 @@ function openProductSelectionSheet() {
   pushNavState();
 }
 
+function openInvoiceProductModal(product = null) {
+  openModal("product", {
+    product,
+    invoiceContext: true,
+    requireName: true
+  });
+}
+
 async function submitInvoiceDraft() {
   const isEditing = Boolean(invoiceDraft.invoiceId);
   console.log(isEditing ? "Update clicked" : "Create clicked");
@@ -2042,11 +2051,15 @@ function modalFieldHtml(type) {
 
   if (type === "product") {
     const product = modalMeta.product || {};
+    const unitMatch = typeof product.name === "string" ? product.name.match(/^(.*?)(?:\s+\(([^)]+)\))?$/) : null;
+    const baseName = unitMatch?.[1]?.trim() || product.name || "";
+    const baseUnit = unitMatch?.[2]?.trim() || "";
     return `
-      <label><span>Name</span><input id="modalProductName" type="text" value="${escapeHtml(product.name || "")}" /></label>
+      <label><span>Name</span><input id="modalProductName" type="text" value="${escapeHtml(baseName)}" ${modalMeta.requireName ? "required" : ""} /></label>
       <label><span>Price</span><input id="modalProductPrice" type="number" min="0.01" step="0.01" value="${product.price ?? ""}" required /></label>
+      <label><span>Unit</span><input id="modalProductUnit" type="text" value="${escapeHtml(baseUnit)}" placeholder="Optional" /></label>
       ${isAdmin() ? `<label><span>GST Rate</span><input id="modalProductGstRate" type="number" min="0" step="0.01" value="${product.gstRate ?? ""}" /></label>` : ""}
-      <label><span>Quantity</span><input id="modalProductStock" type="number" step="1" value="${product.stock ?? 0}" /></label>
+      <label><span>Stock</span><input id="modalProductStock" type="number" step="1" value="${product.stock ?? 0}" /></label>
     `;
   }
 
@@ -2161,17 +2174,30 @@ function openModal(type, meta = {}) {
           await meta.onSuccess(savedCustomer);
         }
       } else if (type === "product") {
+        const rawName = document.getElementById("modalProductName").value.trim();
+        const unit = document.getElementById("modalProductUnit")?.value.trim();
+        if ((meta.requireName || meta.invoiceContext) && !rawName) {
+          throw new Error("Product name is required");
+        }
+        const formattedName = rawName ? (unit ? `${rawName} (${unit})` : rawName) : null;
         const response = await apiRequest(meta.product ? `/api/products/${meta.product.id}` : "/api/products", {
           method: meta.product ? "PUT" : "POST",
           headers: authHeaders(),
           body: JSON.stringify({
-            name: document.getElementById("modalProductName").value.trim(),
+            name: formattedName,
             price: Number(document.getElementById("modalProductPrice").value),
             gstRate: document.getElementById("modalProductGstRate")?.value ?? undefined,
             stock: document.getElementById("modalProductStock").value
           })
         });
-        showMessage(`Product ${response.data.name || `#${response.data.id}`} ${meta.product ? "updated" : "created"}.`);
+        const savedProduct = response.data;
+        state.products = meta.product
+          ? state.products.map((product) => (product.id === savedProduct.id ? savedProduct : product))
+          : [savedProduct, ...state.products];
+        if (meta.invoiceContext) {
+          setDraftQuantity(savedProduct.id, Math.max(1, draftQuantity(savedProduct.id)));
+        }
+        showMessage(`Product ${savedProduct.name || `#${savedProduct.id}`} ${meta.product ? "updated" : "created"}.`);
       } else if (type === "change-password") {
         await apiRequest("/api/auth/change-password", {
           method: "POST",
@@ -2225,6 +2251,11 @@ function openModal(type, meta = {}) {
         renderInvoiceDrawer();
         if (customerSheet?.open) {
           renderCustomerSheet();
+        }
+      } else if (type === "product" && meta.invoiceContext) {
+        renderInvoiceDrawer();
+        if (productSheet?.open) {
+          renderProductSheet();
         }
       }
     } catch (error) {
@@ -2697,6 +2728,10 @@ closeProductSheetBtn.addEventListener("click", () => {
   handleAppBackNavigation();
 });
 productSheetSearchInput.addEventListener("input", renderProductSheet);
+addProductFromSheetBtn?.addEventListener("click", () => {
+  logClick("add-product-from-sheet");
+  openInvoiceProductModal();
+});
 productSheetDoneBtn?.addEventListener("click", () => {
   logClick("product-sheet-done", { itemCount: invoiceDraft.items.length });
   productSheet.close();
