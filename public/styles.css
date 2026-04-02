@@ -484,6 +484,13 @@ textarea {
   flex-wrap: wrap;
 }
 
+.invoice-customer-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
 .toast {
   margin-top: 16px;
   padding: 14px 16px;
@@ -765,6 +772,11 @@ textarea {
   gap: 12px;
 }
 
+.customer-sheet-actions {
+  width: 100%;
+  justify-content: space-between;
+}
+
 .detail-meta {
   display: grid;
   grid-template-columns: 1fr;
@@ -931,6 +943,29 @@ textarea {
 .customer-ledger-shell .section-title p,
 .customer-ledger-shell .ledger-meta {
   color: var(--text-secondary);
+}
+
+.entry-modal .modal-shell strong,
+.entry-modal .modal-shell h3,
+.entry-modal .modal-shell .ledger-name,
+.entry-modal .modal-shell .amount-main,
+.entry-modal .modal-shell .ledger-row,
+.entry-modal .modal-shell .chip {
+  color: var(--text-primary);
+}
+
+.entry-modal .modal-shell label span,
+.entry-modal .modal-shell .mini-label,
+.entry-modal .modal-shell .ledger-meta,
+.entry-modal .modal-shell .shortcut-note,
+.entry-modal .modal-shell .row-subtitle {
+  color: var(--text-secondary);
+}
+
+.entry-modal .modal-shell input,
+.entry-modal .modal-shell select,
+.entry-modal .modal-shell textarea {
+  color: var(--text-primary);
 }
 
 .modal-fields {
@@ -1203,6 +1238,11 @@ textarea {
 
   .detail-meta {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .invoice-customer-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .app-header,
