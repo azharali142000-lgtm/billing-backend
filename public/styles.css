@@ -945,6 +945,29 @@ textarea {
   color: var(--text-secondary);
 }
 
+.entry-modal .modal-shell strong,
+.entry-modal .modal-shell h3,
+.entry-modal .modal-shell .ledger-name,
+.entry-modal .modal-shell .amount-main,
+.entry-modal .modal-shell .ledger-row,
+.entry-modal .modal-shell .chip {
+  color: var(--text-primary);
+}
+
+.entry-modal .modal-shell label span,
+.entry-modal .modal-shell .mini-label,
+.entry-modal .modal-shell .ledger-meta,
+.entry-modal .modal-shell .shortcut-note,
+.entry-modal .modal-shell .row-subtitle {
+  color: var(--text-secondary);
+}
+
+.entry-modal .modal-shell input,
+.entry-modal .modal-shell select,
+.entry-modal .modal-shell textarea {
+  color: var(--text-primary);
+}
+
 .modal-fields {
   display: grid;
   gap: 8px;
