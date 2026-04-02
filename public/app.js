@@ -10,6 +10,13 @@ const state = {
   invoices: [],
   salesInvoices: [],
   payments: [],
+  printer: {
+    available: false,
+    platform: "web",
+    connected: false,
+    savedPrinter: null,
+    pairedDevices: []
+  },
   activeScreen: "sales",
   invoiceStatusFilter: "ALL",
   salesDateFilter: "TODAY",
@@ -74,6 +81,13 @@ const companyGstNumberInput = document.getElementById("companyGstNumberInput");
 const companyBankDetailsInput = document.getElementById("companyBankDetailsInput");
 const companyTermsInput = document.getElementById("companyTermsInput");
 const saveCompanyProfileBtn = document.getElementById("saveCompanyProfileBtn");
+const printerSettingsSection = document.getElementById("printerSettingsSection");
+const printerStatusText = document.getElementById("printerStatusText");
+const printerSavedText = document.getElementById("printerSavedText");
+const printerScanBtn = document.getElementById("printerScanBtn");
+const printerReconnectBtn = document.getElementById("printerReconnectBtn");
+const printerClearBtn = document.getElementById("printerClearBtn");
+const printerDeviceList = document.getElementById("printerDeviceList");
 const gstSettingsSection = document.getElementById("gstSettingsSection");
 const gstEnabledToggle = document.getElementById("gstEnabledToggle");
 const gstModeSelect = document.getElementById("gstModeSelect");
@@ -145,8 +159,6 @@ const invoiceActionButtons = () => [...document.querySelectorAll("[data-invoice-
 let modalSubmitHandler = null;
 let syncInterval = null;
 let pendingResetWorkerId = null;
-let bluetoothPrinterServer = null;
-let bluetoothPrinterCharacteristic = null;
 let invoiceSubmitting = false;
 let invoiceDraftBaseline = null;
 let suppressHistoryPush = false;
@@ -264,6 +276,93 @@ async function apiRequest(url, options = {}) {
   }
 
   return data;
+}
+
+function getCapacitorPlatform() {
+  return window.Capacitor?.getPlatform?.() || "web";
+}
+
+function getNativePrinterPlugin() {
+  return window.Capacitor?.Plugins?.NativeBluetoothPrinter || null;
+}
+
+function isNativeAndroidPrinterAvailable() {
+  return getCapacitorPlatform() === "android" && Boolean(getNativePrinterPlugin());
+}
+
+async function refreshNativePrinterState({ scan = false, reconnect = false } = {}) {
+  const plugin = getNativePrinterPlugin();
+
+  if (!plugin) {
+    state.printer = {
+      available: false,
+      platform: getCapacitorPlatform(),
+      connected: false,
+      savedPrinter: null,
+      pairedDevices: []
+    };
+    renderSettingsScreen();
+    return state.printer;
+  }
+
+  if (reconnect && plugin.reconnectSavedPrinter) {
+    try {
+      await plugin.reconnectSavedPrinter();
+    } catch (error) {
+      console.log("[Billr] printer reconnect failed", { message: error.message });
+    }
+  }
+
+  const [status, paired] = await Promise.all([
+    plugin.getStatus(),
+    scan ? plugin.listPairedDevices() : Promise.resolve({ devices: state.printer.pairedDevices || [] })
+  ]);
+
+  state.printer = {
+    available: Boolean(status.available),
+    platform: status.platform || getCapacitorPlatform(),
+    connected: Boolean(status.connected),
+    savedPrinter: status.savedPrinter || null,
+    pairedDevices: paired.devices || []
+  };
+
+  renderSettingsScreen();
+  return state.printer;
+}
+
+async function saveNativePrinter(device) {
+  const plugin = getNativePrinterPlugin();
+  if (!plugin) {
+    throw new Error("Native printer plugin is not available");
+  }
+
+  await plugin.savePrinter({
+    address: device.address,
+    name: device.name || "Thermal Printer"
+  });
+
+  await refreshNativePrinterState({ reconnect: true, scan: true });
+}
+
+async function clearNativePrinterSelection() {
+  const plugin = getNativePrinterPlugin();
+  if (!plugin?.clearSavedPrinter) {
+    state.printer.savedPrinter = null;
+    state.printer.connected = false;
+    renderSettingsScreen();
+    return;
+  }
+
+  await plugin.clearSavedPrinter();
+  await refreshNativePrinterState({ scan: true });
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
 }
 
 function currency(value) {
@@ -554,6 +653,10 @@ function renderVisibility() {
 
   if (companyProfileSection) {
     companyProfileSection.classList.toggle("hidden", !loggedIn || !isAdmin());
+  }
+
+  if (printerSettingsSection) {
+    printerSettingsSection.classList.toggle("hidden", !loggedIn || !isAdmin());
   }
 
   if (gstSettingsSection) {
@@ -1102,61 +1205,29 @@ function buildEscPosBytes(invoice) {
   return payload;
 }
 
-async function getBluetoothPrinterCharacteristic(server) {
-  const candidates = [
-    ["0000ffe0-0000-1000-8000-00805f9b34fb", "0000ffe1-0000-1000-8000-00805f9b34fb"],
-    ["49535343-fe7d-4ae5-8fa9-9fafd205e455", "49535343-8841-43f4-a8d4-ecbe34729bb3"],
-    ["e7810a71-73ae-499d-8c15-faa9aef0c3f2", "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"]
-  ];
+async function printInvoiceViaNativeBluetooth(invoice) {
+  console.log("[Billr] Thermal Print clicked", {
+    invoiceId: invoice.id,
+    platform: getCapacitorPlatform()
+  });
 
-  for (const [serviceId, characteristicId] of candidates) {
-    try {
-      const service = await server.getPrimaryService(serviceId);
-      const characteristic = await service.getCharacteristic(characteristicId);
-      console.log("[Billr] bluetooth characteristic ready", { serviceId, characteristicId });
-      return characteristic;
-    } catch (error) {
-      console.log("[Billr] bluetooth probe failed", {
-        serviceId,
-        characteristicId,
-        message: error.message
-      });
-    }
+  const plugin = getNativePrinterPlugin();
+  if (!plugin) {
+    throw new Error("Native Bluetooth printing is only available in the Android APK");
   }
 
-  throw new Error("No supported Bluetooth thermal printer service was found.");
-}
+  const payload = bytesToBase64(buildEscPosBytes(invoice));
+  const result = await plugin.printEscPos({
+    payloadBase64: payload
+  });
 
-async function printInvoiceViaBluetooth(invoice) {
-  console.log("[Billr] Thermal Print clicked", { invoiceId: invoice.id });
-
-  if (!("bluetooth" in navigator)) {
-    throw new Error("Web Bluetooth is not supported in this browser");
-  }
-
-  if (!bluetoothPrinterServer || !bluetoothPrinterServer.connected || !bluetoothPrinterCharacteristic) {
-    console.log("[Billr] requesting bluetooth device");
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        "0000ffe0-0000-1000-8000-00805f9b34fb",
-        "49535343-fe7d-4ae5-8fa9-9fafd205e455",
-        "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
-      ]
-    });
-
-    console.log("[Billr] bluetooth device selected", { name: device.name || "Unknown printer" });
-    bluetoothPrinterServer = await device.gatt.connect();
-    console.log("[Billr] bluetooth connected");
-    bluetoothPrinterCharacteristic = await getBluetoothPrinterCharacteristic(bluetoothPrinterServer);
-  }
-
-  const payload = buildEscPosBytes(invoice);
-  for (let offset = 0; offset < payload.length; offset += 180) {
-    await bluetoothPrinterCharacteristic.writeValue(payload.slice(offset, offset + 180));
-  }
-
-  console.log("[Billr] thermal print success", { bytes: payload.length });
+  state.printer.connected = Boolean(result.connected);
+  state.printer.savedPrinter = result.savedPrinter || state.printer.savedPrinter;
+  renderSettingsScreen();
+  console.log("[Billr] thermal print success", {
+    bytes: payload.length,
+    printer: result.savedPrinter?.address || null
+  });
 }
 
 function openInvoiceDocument(invoice, options = {}) {
@@ -1292,13 +1363,17 @@ async function handleInvoiceAction(action) {
   }
 
   if (action === "thermal-print") {
-    try {
-      await printInvoiceViaBluetooth(invoice);
-      showMessage("Thermal print sent to Bluetooth printer.");
-    } catch (error) {
-      console.log("[Billr] thermal print failure", { message: error.message });
-      openInvoiceDocument(invoice, { print: true, thermal: true });
-      showMessage(`${error.message}. Preview opened as fallback.`, true);
+    if (isNativeAndroidPrinterAvailable()) {
+      try {
+        await printInvoiceViaNativeBluetooth(invoice);
+        showMessage("Thermal print sent to the saved Bluetooth printer.");
+      } catch (error) {
+        console.log("[Billr] thermal print failure", { message: error.message });
+        showMessage(error.message, true);
+      }
+    } else {
+      await openInvoicePdf(invoice);
+      showMessage("Bluetooth printing is available in the Android APK. PDF preview opened instead.");
     }
     return;
   }
@@ -1469,6 +1544,82 @@ function renderSettingsScreen() {
         `
       )
       .join("");
+  }
+
+  if (printerStatusText) {
+    if (!isNativeAndroidPrinterAvailable()) {
+      printerStatusText.textContent =
+        getCapacitorPlatform() === "android"
+          ? "Native printer plugin is unavailable in this build."
+          : "Bluetooth printing is available in the Android APK. Web uses PDF preview.";
+    } else if (state.printer.connected) {
+      printerStatusText.textContent = "Printer connected and ready for thermal printing.";
+    } else if (state.printer.savedPrinter) {
+      printerStatusText.textContent = "Saved printer found. Tap Reconnect or print an invoice to connect.";
+    } else {
+      printerStatusText.textContent = "No printer selected yet. Scan paired devices and choose one.";
+    }
+  }
+
+  if (printerSavedText) {
+    printerSavedText.textContent = state.printer.savedPrinter
+      ? `Saved printer: ${state.printer.savedPrinter.name || "Thermal Printer"} (${state.printer.savedPrinter.address})`
+      : "No printer selected.";
+  }
+
+  if (printerScanBtn) {
+    printerScanBtn.disabled = !isNativeAndroidPrinterAvailable();
+  }
+  if (printerReconnectBtn) {
+    printerReconnectBtn.disabled = !isNativeAndroidPrinterAvailable() || !state.printer.savedPrinter;
+  }
+  if (printerClearBtn) {
+    printerClearBtn.disabled = !isNativeAndroidPrinterAvailable() || !state.printer.savedPrinter;
+  }
+
+  if (printerDeviceList) {
+    if (!isNativeAndroidPrinterAvailable()) {
+      printerDeviceList.innerHTML = `<article class="worker-row"><div class="ledger-name">Open the Android APK to manage Bluetooth printers.</div></article>`;
+    } else if (!state.printer.pairedDevices.length) {
+      printerDeviceList.innerHTML = `<article class="worker-row"><div class="ledger-name">No paired devices loaded yet. Tap "Scan Paired Devices".</div></article>`;
+    } else {
+      printerDeviceList.innerHTML = state.printer.pairedDevices
+        .map(
+          (device) => `
+            <article class="worker-row${state.printer.savedPrinter?.address === device.address ? " active-printer" : ""}">
+              <div class="worker-main">
+                <div class="ledger-left">
+                  <span class="avatar">${initials(device.name || "BT")}</span>
+                  <div>
+                    <div class="ledger-name">${device.name || "Bluetooth Printer"}</div>
+                    <div class="ledger-meta">${device.address}</div>
+                  </div>
+                </div>
+                <div class="worker-actions">
+                  <button class="chip chip-ghost" data-printer-action="select" data-printer-address="${device.address}" data-printer-name="${escapeHtml(device.name || "Bluetooth Printer")}" type="button">
+                    ${state.printer.savedPrinter?.address === device.address ? "Selected" : "Use Printer"}
+                  </button>
+                </div>
+              </div>
+            </article>
+          `
+        )
+        .join("");
+
+      printerDeviceList.querySelectorAll("[data-printer-action='select']").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            await saveNativePrinter({
+              address: button.dataset.printerAddress,
+              name: button.dataset.printerName
+            });
+            showMessage("Printer saved and connected.");
+          } catch (error) {
+            showMessage(error.message, true);
+          }
+        });
+      });
+    }
   }
 
   if (!workerList) {
@@ -1992,6 +2143,11 @@ async function loadDashboard(showToast = false) {
   state.workers = isAdmin()
     ? (await apiRequest("/api/auth/workers", { headers: authHeaders() })).data
     : [];
+  try {
+    await refreshNativePrinterState({ reconnect: true });
+  } catch (error) {
+    console.log("[Billr] printer state refresh failed", { message: error.message });
+  }
   await fetchSalesInvoices();
   if (state.customerLedger.customerId) {
     state.customerLedger.customer =
@@ -2310,6 +2466,13 @@ function logout() {
   state.products = [];
   state.invoices = [];
   state.payments = [];
+  state.printer = {
+    available: false,
+    platform: "web",
+    connected: false,
+    savedPrinter: null,
+    pairedDevices: []
+  };
   localStorage.removeItem("billr_token");
   localStorage.removeItem("billr_user");
   if (syncInterval) {
@@ -2473,6 +2636,33 @@ settingsResetWorkerBtn?.addEventListener("click", () => {
   }
   pendingResetWorkerId = state.workers.find((worker) => worker.isActive)?.id || null;
   openModal("reset-worker-password");
+});
+printerScanBtn?.addEventListener("click", async () => {
+  logClick("printer-scan");
+  try {
+    await refreshNativePrinterState({ scan: true });
+    showMessage("Paired Bluetooth devices loaded.");
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+});
+printerReconnectBtn?.addEventListener("click", async () => {
+  logClick("printer-reconnect");
+  try {
+    await refreshNativePrinterState({ reconnect: true, scan: true });
+    showMessage(state.printer.connected ? "Printer connected." : "Reconnect attempted.");
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+});
+printerClearBtn?.addEventListener("click", async () => {
+  logClick("printer-clear");
+  try {
+    await clearNativePrinterSelection();
+    showMessage("Saved printer cleared.");
+  } catch (error) {
+    showMessage(error.message, true);
+  }
 });
 [themeDarkBtn, themePanelDarkBtn].forEach((button) => {
   button?.addEventListener("click", () => {
