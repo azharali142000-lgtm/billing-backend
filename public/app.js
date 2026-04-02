@@ -102,6 +102,7 @@ const closeInvoiceDrawerBtn = document.getElementById("closeInvoiceDrawerBtn");
 const invoiceDraftNumberEl = document.getElementById("invoiceDraftNumber");
 const invoiceDraftDateEl = document.getElementById("invoiceDraftDate");
 const selectCustomerBtn = document.getElementById("selectCustomerBtn");
+const editSelectedCustomerBtn = document.getElementById("editSelectedCustomerBtn");
 const invoiceDraftItemsEl = document.getElementById("invoiceDraftItems");
 const openProductSheetBtn = document.getElementById("openProductSheetBtn");
 const invoiceSubtotalEl = document.getElementById("invoiceSubtotal");
@@ -115,6 +116,7 @@ const createInvoiceBtn = document.getElementById("createInvoiceBtn");
 const customerSheet = document.getElementById("customerSheet");
 const closeCustomerSheetBtn = document.getElementById("closeCustomerSheetBtn");
 const customerSearchInput = document.getElementById("customerSearchInput");
+const addCustomerFromSheetBtn = document.getElementById("addCustomerFromSheetBtn");
 const customerSheetList = document.getElementById("customerSheetList");
 const customerLedgerSheet = document.getElementById("customerLedgerSheet");
 const closeCustomerLedgerSheetBtn = document.getElementById("closeCustomerLedgerSheetBtn");
@@ -1610,6 +1612,9 @@ function renderInvoiceDrawer() {
   selectCustomerBtn.textContent = selectedCustomer
     ? `${selectedCustomer.name} | ${currency(selectedCustomer.balance)}`
     : "Select Customer";
+  if (editSelectedCustomerBtn) {
+    editSelectedCustomerBtn.disabled = !selectedCustomer;
+  }
 
   const { subtotal, total } = getDraftInvoiceTotal();
   const gstPreview = getInvoiceGstPreview();
@@ -1714,9 +1719,12 @@ function renderCustomerSheet() {
                     <div class="ledger-meta">${customer.phone || customer.address || "No extra contact details"}</div>
                   </div>
                 </div>
-                <strong class="ledger-balance ${Number(customer.balance) > 0 ? "negative" : "positive"}">
-                  ${currency(customer.balance)}
-                </strong>
+                <div class="worker-actions customer-sheet-actions">
+                  <strong class="ledger-balance ${Number(customer.balance) > 0 ? "negative" : "positive"}">
+                    ${currency(customer.balance)}
+                  </strong>
+                  <button class="chip chip-ghost" data-edit-sheet-customer-id="${customer.id}" type="button">Edit</button>
+                </div>
               </div>
             </article>
           `
@@ -1731,6 +1739,23 @@ function renderCustomerSheet() {
       customerSheet.close();
       renderProductSheet();
     });
+  });
+
+  customerSheetList.querySelectorAll("[data-edit-sheet-customer-id]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const customer = state.customers.find((entry) => entry.id === Number(node.dataset.editSheetCustomerId));
+      if (customer) {
+        openInvoiceCustomerModal(customer);
+      }
+    });
+  });
+}
+
+function openInvoiceCustomerModal(customer = null) {
+  openModal("customer", {
+    customer,
+    invoiceContext: true
   });
 }
 
@@ -2124,7 +2149,17 @@ function openModal(type, meta = {}) {
             address: document.getElementById("modalCustomerAddress").value.trim()
           })
         });
-        showMessage(`Customer ${response.data.name} ${meta.customer ? "updated" : "created"}.`);
+        const savedCustomer = response.data;
+        state.customers = meta.customer
+          ? state.customers.map((customer) => (customer.id === savedCustomer.id ? savedCustomer : customer))
+          : [savedCustomer, ...state.customers];
+        if (meta.invoiceContext) {
+          invoiceDraft.customerId = savedCustomer.id;
+        }
+        showMessage(`Customer ${savedCustomer.name} ${meta.customer ? "updated" : "created"}.`);
+        if (typeof meta.onSuccess === "function") {
+          await meta.onSuccess(savedCustomer);
+        }
       } else if (type === "product") {
         const response = await apiRequest(meta.product ? `/api/products/${meta.product.id}` : "/api/products", {
           method: meta.product ? "PUT" : "POST",
@@ -2186,6 +2221,12 @@ function openModal(type, meta = {}) {
 
       entryModal.close();
       await loadDashboard();
+      if (type === "customer" && meta.invoiceContext) {
+        renderInvoiceDrawer();
+        if (customerSheet?.open) {
+          renderCustomerSheet();
+        }
+      }
     } catch (error) {
       showMessage(error.message, true);
     }
@@ -2602,6 +2643,13 @@ selectCustomerBtn.addEventListener("click", () => {
   logClick("select-customer");
   openCustomerSelectionSheet();
 });
+editSelectedCustomerBtn?.addEventListener("click", () => {
+  const customer = state.customers.find((entry) => entry.id === invoiceDraft.customerId);
+  logClick("edit-selected-customer", { customerId: customer?.id || null });
+  if (customer) {
+    openInvoiceCustomerModal(customer);
+  }
+});
 openProductSheetBtn.addEventListener("click", () => {
   logClick("open-product-sheet");
   openProductSelectionSheet();
@@ -2615,6 +2663,10 @@ closeCustomerSheetBtn.addEventListener("click", () => {
   handleAppBackNavigation();
 });
 customerSearchInput.addEventListener("input", renderCustomerSheet);
+addCustomerFromSheetBtn?.addEventListener("click", () => {
+  logClick("add-customer-from-sheet");
+  openInvoiceCustomerModal();
+});
 closeCustomerLedgerSheetBtn?.addEventListener("click", () => {
   handleAppBackNavigation();
 });

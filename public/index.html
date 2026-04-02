@@ -413,7 +413,10 @@
             <span class="mini-label">Date</span>
             <strong id="invoiceDraftDate">-</strong>
           </div>
-          <button id="selectCustomerBtn" class="ghost-btn wide-btn" type="button">Select Customer</button>
+          <div class="invoice-customer-actions">
+            <button id="selectCustomerBtn" class="ghost-btn wide-btn" type="button">Select Customer</button>
+            <button id="editSelectedCustomerBtn" class="ghost-btn wide-btn" type="button">Edit Customer</button>
+          </div>
         </div>
 
         <section class="invoice-composer-card">
@@ -464,6 +467,7 @@
           <span>Search</span>
           <input id="customerSearchInput" type="search" placeholder="Search customer" />
         </label>
+        <button id="addCustomerFromSheetBtn" class="ghost-btn wide-btn" type="button">+ Add Customer</button>
         <div id="customerSheetList" class="ledger-list"></div>
       </div>
     </dialog>

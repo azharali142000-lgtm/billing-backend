@@ -484,6 +484,13 @@ textarea {
   flex-wrap: wrap;
 }
 
+.invoice-customer-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
 .toast {
   margin-top: 16px;
   padding: 14px 16px;
@@ -763,6 +770,11 @@ textarea {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.customer-sheet-actions {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .detail-meta {
@@ -1203,6 +1215,11 @@ textarea {
 
   .detail-meta {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .invoice-customer-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .app-header,
