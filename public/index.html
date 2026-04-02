@@ -49,13 +49,12 @@
             <h2 id="screenTitle">Sales / Bills</h2>
           </div>
           <div class="header-actions">
-            <button id="customersShortcutBtn" class="icon-btn" type="button">Customers</button>
-            <button id="productsShortcutBtn" class="icon-btn" type="button">Products</button>
-            <span id="syncBadge" class="sync-badge">Syncing</span>
-            <button id="refreshBtn" class="icon-btn" type="button">Refresh</button>
             <div class="settings-wrap">
-              <button id="settingsMenuBtn" class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false">&#9881;</button>
+              <button id="settingsMenuBtn" class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false">&#8942;</button>
               <div id="settingsMenu" class="settings-menu hidden">
+                <button id="settingsSyncBtn" class="settings-menu-item" type="button">Sync</button>
+                <button id="settingsRefreshBtn" class="settings-menu-item" type="button">Refresh</button>
+                <button id="settingsOpenPanelBtn" class="settings-menu-item" type="button">Settings</button>
                 <button id="settingsChangePasswordBtn" class="settings-menu-item" type="button">Change Password</button>
                 <div class="settings-menu-group">
                   <span class="settings-menu-label">Theme</span>
@@ -101,19 +100,15 @@
           <button class="main-tab active" data-screen="sales" type="button">Sales</button>
           <button class="main-tab" data-screen="inventory" type="button">Inventory</button>
           <button class="main-tab" data-screen="ledger" type="button">Ledger</button>
-          <button class="main-tab" data-screen="detail" type="button">Invoice Detail</button>
-          <button class="main-tab" data-screen="more" type="button">More</button>
+        </nav>
+
+        <nav class="main-tabs secondary-tabs">
+          <button id="customersShortcutBtn" class="main-tab" type="button">Customers</button>
+          <button id="productsShortcutBtn" class="main-tab" type="button">Products</button>
         </nav>
 
         <main class="screen-stack">
           <section id="salesScreen" class="screen-panel active">
-            <div class="inner-tabs">
-              <button class="inner-tab active" type="button">Sales</button>
-              <button class="inner-tab" type="button">Purchases</button>
-              <button class="inner-tab" type="button">Quotations</button>
-              <button class="inner-tab" type="button">More</button>
-            </div>
-
             <div class="toolbar-row">
               <div class="filter-stack">
                 <select id="salesDateFilter" class="chip chip-ghost filter-select">
@@ -277,68 +272,7 @@
             </section>
           </section>
 
-          <section id="moreScreen" class="screen-panel">
-            <div class="summary-grid three">
-              <article class="summary-card">
-                <span>Low Stock Alerts</span>
-                <strong id="moreLowStock">0</strong>
-              </article>
-              <article class="summary-card">
-                <span>Daily Sales</span>
-                <strong id="moreDailySales">Rs 0.00</strong>
-              </article>
-              <article class="summary-card success">
-                <span>Pending Tracking</span>
-                <strong id="morePendingCount">0</strong>
-              </article>
-            </div>
-
-            <section class="feature-list-card">
-              <div class="section-title compact">
-                <p class="mini-label">Operations</p>
-                <h3>Business Workflow</h3>
-              </div>
-              <div class="workflow-line">
-                <div class="workflow-step">
-                  <strong>Staff 1</strong>
-                  <span>Takes orders from shops</span>
-                </div>
-                <div class="workflow-step">
-                  <strong>Staff 2</strong>
-                  <span>Packs items instantly from synced orders</span>
-                </div>
-                <div class="workflow-step">
-                  <strong>System</strong>
-                  <span>Stock updates, credit tracked, reports stay current</span>
-                </div>
-              </div>
-            </section>
-
-            <section class="feature-list-card">
-              <div class="section-title compact">
-                <p class="mini-label">Access</p>
-                <h3>User Roles</h3>
-              </div>
-              <div class="role-cards">
-                <article class="role-card">
-                  <h4>Admin (Owner)</h4>
-                  <ul>
-                    <li>Full access to invoices, stock, customers, reports</li>
-                    <li>Can view sensitive numbers and performance</li>
-                    <li>Controls team and product setup</li>
-                  </ul>
-                </article>
-                <article class="role-card">
-                  <h4>Staff</h4>
-                  <ul>
-                    <li>Can create invoices and view customers</li>
-                    <li>Cannot delete invoices</li>
-                    <li>Cannot see profit or sensitive reports</li>
-                  </ul>
-                </article>
-              </div>
-            </section>
-
+          <section id="settingsScreen" class="screen-panel">
             <section class="feature-list-card">
               <div class="section-title compact">
                 <p class="mini-label">Settings</p>

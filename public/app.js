@@ -46,14 +46,15 @@ const workerChangePasswordBtn = document.getElementById("workerChangePasswordBtn
 const workerLogoutBtn = document.getElementById("workerLogoutBtn");
 const globalMessage = document.getElementById("globalMessage");
 const screenTitle = document.getElementById("screenTitle");
-const syncBadge = document.getElementById("syncBadge");
-const refreshBtn = document.getElementById("refreshBtn");
 const salesDateFilter = document.getElementById("salesDateFilter");
 const salesCustomDateRange = document.getElementById("salesCustomDateRange");
 const salesStartDate = document.getElementById("salesStartDate");
 const salesEndDate = document.getElementById("salesEndDate");
 const settingsMenuBtn = document.getElementById("settingsMenuBtn");
 const settingsMenu = document.getElementById("settingsMenu");
+const settingsSyncBtn = document.getElementById("settingsSyncBtn");
+const settingsRefreshBtn = document.getElementById("settingsRefreshBtn");
+const settingsOpenPanelBtn = document.getElementById("settingsOpenPanelBtn");
 const settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
 const settingsUserManagementBtn = document.getElementById("settingsUserManagementBtn");
 const settingsAddWorkerBtn = document.getElementById("settingsAddWorkerBtn");
@@ -395,7 +396,9 @@ function normalizeRole(role) {
 }
 
 function setSyncState(text) {
-  syncBadge.textContent = text;
+  if (settingsSyncBtn) {
+    settingsSyncBtn.textContent = text === "Syncing" ? "Syncing..." : "Sync";
+  }
 }
 
 function cloneDraftState(draft = invoiceDraft) {
@@ -555,15 +558,7 @@ function renderVisibility() {
   }
 
   if (settingsMenuBtn) {
-    settingsMenuBtn.classList.toggle("hidden", !loggedIn || !isAdmin());
-  }
-
-  document.querySelectorAll('.main-tab[data-screen="more"]').forEach((node) => {
-    node.classList.toggle("hidden", !loggedIn || !isAdmin());
-  });
-
-  if (loggedIn && !isAdmin() && state.activeScreen === "more") {
-    state.activeScreen = "sales";
+    settingsMenuBtn.classList.toggle("hidden", !loggedIn);
   }
 
   document.querySelectorAll(".admin-only").forEach((node) => {
@@ -572,13 +567,12 @@ function renderVisibility() {
 }
 
 function selectScreen(screen, options = {}) {
-  if (screen === "more" && !isAdmin()) {
-    screen = "sales";
-  }
   state.activeScreen = screen;
   document.querySelectorAll(".main-tab").forEach((button) => {
     button.classList.toggle("active", button.dataset.screen === screen);
   });
+  customersShortcutBtn?.classList.toggle("active", screen === "ledger");
+  productsShortcutBtn?.classList.toggle("active", screen === "inventory");
   document.querySelectorAll(".screen-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === `${screen}Screen`);
   });
@@ -588,7 +582,7 @@ function selectScreen(screen, options = {}) {
       inventory: "Products & Inventory",
       ledger: "Customers Ledger",
       detail: "Invoice Detail",
-      more: "More"
+      settings: "Settings"
     }[screen] || "Billr";
   updateFabs();
   if (!options.skipHistory) {
@@ -1440,16 +1434,7 @@ function renderDetailScreen() {
     : `<div class="detail-item-row">No items on this invoice.</div>`;
 }
 
-function renderMoreScreen() {
-  const lowStock = state.products.filter((product) => Number(product.stock) <= 5).length;
-  const todayKey = new Date().toDateString();
-  const todayInvoices = state.invoices.filter((invoice) => new Date(invoice.createdAt).toDateString() === todayKey);
-  const todaySales = todayInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const pendingCount = state.customers.filter((customer) => Number(customer.balance) > 0).length;
-  document.getElementById("moreLowStock").textContent = String(lowStock);
-  document.getElementById("moreDailySales").textContent = currency(todaySales);
-  document.getElementById("morePendingCount").textContent = String(pendingCount);
-
+function renderSettingsScreen() {
   if (isAdmin() && state.companyProfile) {
     companyNameInput.value = state.companyProfile.companyName || "";
     companyAddressInput.value = state.companyProfile.address || "";
@@ -1944,7 +1929,7 @@ function renderAll() {
   renderInventoryScreen();
   renderLedgerScreen();
   renderDetailScreen();
-  renderMoreScreen();
+  renderSettingsScreen();
   renderCustomerLedgerSheet();
 }
 
@@ -2342,8 +2327,9 @@ function handleAppBackNavigation() {
 }
 
 loginForm.addEventListener("submit", login);
-refreshBtn.addEventListener("click", async () => {
+settingsRefreshBtn?.addEventListener("click", async () => {
   logClick("refresh");
+  closeSettingsMenu();
   try {
     await loadDashboard(true);
   } catch (error) {
@@ -2389,8 +2375,22 @@ settingsAddWorkerBtn?.addEventListener("click", () => {
 settingsUserManagementBtn?.addEventListener("click", () => {
   logClick("settings-user-management");
   closeSettingsMenu();
-  selectScreen("more");
+  selectScreen("settings");
   userManagementSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+settingsOpenPanelBtn?.addEventListener("click", () => {
+  logClick("settings-open");
+  closeSettingsMenu();
+  selectScreen("settings");
+});
+settingsSyncBtn?.addEventListener("click", async () => {
+  logClick("settings-sync");
+  closeSettingsMenu();
+  try {
+    await loadDashboard(true);
+  } catch (error) {
+    showMessage(error.message, true);
+  }
 });
 settingsResetWorkerBtn?.addEventListener("click", () => {
   logClick("settings-reset-worker");
@@ -2565,7 +2565,7 @@ productFilterBtn.addEventListener("click", () => {
 
 primaryFab.addEventListener("click", () => {
   logClick("primary-fab", { screen: state.activeScreen });
-  if (state.activeScreen === "sales" || state.activeScreen === "detail" || state.activeScreen === "more") {
+  if (state.activeScreen === "sales" || state.activeScreen === "detail" || state.activeScreen === "settings") {
     invoiceDraft.invoiceId = null;
     openInvoiceDrawer();
   } else if (state.activeScreen === "inventory") {
