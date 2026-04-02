@@ -95,6 +95,8 @@ body {
     linear-gradient(180deg, var(--background), var(--background-end));
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  overflow-x: hidden;
   transition: background 180ms ease, color 180ms ease;
 }
 
@@ -110,16 +112,16 @@ textarea {
 }
 
 .mobile-shell {
-  max-width: 1320px;
+  width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 12px;
 }
 
 .auth-screen {
-  min-height: calc(100vh - 48px);
+  min-height: calc(100vh - 24px);
   display: grid;
-  grid-template-columns: 1.2fr 0.9fr;
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .auth-brand,
@@ -141,7 +143,7 @@ textarea {
 
 .auth-brand {
   border-radius: 36px;
-  padding: 40px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -165,22 +167,23 @@ textarea {
 
 .auth-brand h1 {
   margin: 0;
-  font-size: clamp(2.4rem, 5vw, 4.8rem);
-  line-height: 0.96;
-  max-width: 560px;
+  font-size: clamp(1.8rem, 8vw, 2.9rem);
+  line-height: 1.02;
+  max-width: none;
 }
 
 .auth-brand p {
   color: var(--muted);
-  max-width: 560px;
-  line-height: 1.7;
+  max-width: none;
+  line-height: 1.55;
+  font-size: 0.94rem;
 }
 
 .auth-points {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .auth-points span,
@@ -192,25 +195,25 @@ textarea {
 }
 
 .auth-points span {
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--pill-surface);
   color: var(--text-primary);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 
 .auth-card {
   border-radius: 30px;
-  padding: 28px;
+  padding: 16px;
   align-self: center;
   background: linear-gradient(180deg, var(--surface), var(--surface-alt));
 }
 
 .section-title {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .section-title.compact {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .mini-label {
@@ -218,7 +221,7 @@ textarea {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
 }
 
 .section-title h2,
@@ -240,14 +243,14 @@ label {
 
 label span {
   color: var(--text-secondary);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
 }
 
 input,
 select,
 textarea {
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--surface-soft);
@@ -293,7 +296,7 @@ textarea {
 }
 
 .primary-btn {
-  padding: 14px 18px;
+  padding: 12px 14px;
   border-radius: 16px;
   color: var(--inverse-text);
   font-weight: 700;
@@ -318,14 +321,14 @@ textarea {
 .chip,
 .inner-tab,
 .sheet-action {
-  padding: 11px 14px;
+  padding: 10px 12px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
   color: var(--text);
 }
 
 .icon-btn {
-  padding: 10px 12px;
+  padding: 10px;
 }
 
 .support-text,
@@ -343,7 +346,7 @@ textarea {
 
 .app-header h2 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.4rem;
 }
 
 .header-actions,
@@ -365,17 +368,20 @@ textarea {
 .header-actions {
   flex-wrap: wrap;
   position: relative;
+  width: 100%;
 }
 
 .settings-wrap {
   position: relative;
+  width: 100%;
 }
 
 .settings-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  min-width: 220px;
+  position: static;
+  top: auto;
+  right: auto;
+  min-width: 0;
+  width: 100%;
   padding: 10px;
   border-radius: 18px;
   border: 1px solid var(--line);
@@ -434,6 +440,9 @@ textarea {
 }
 
 .sync-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 14px;
   font-size: 0.9rem;
   color: var(--accent-text);
@@ -442,14 +451,15 @@ textarea {
 
 .context-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .context-card {
   border-radius: 20px;
-  padding: 16px 18px;
+  width: 100%;
+  padding: 12px;
 }
 
 .context-card span,
@@ -463,7 +473,7 @@ textarea {
 
 .context-card strong,
 .summary-card strong {
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
 
 .worker-quick-actions {
@@ -489,15 +499,16 @@ textarea {
 .main-tabs {
   overflow-x: auto;
   padding: 8px 0 0;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .main-tab {
   white-space: nowrap;
-  padding: 14px 18px;
+  padding: 12px 14px;
   border-radius: 18px;
   background: var(--surface-alt);
   color: var(--text-secondary);
+  flex: 0 0 auto;
 }
 
 .main-tab.active,
@@ -508,13 +519,14 @@ textarea {
 }
 
 .screen-stack {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .screen-panel {
   display: none;
   border-radius: 28px;
-  padding: 22px;
+  width: 100%;
+  padding: 12px;
   background: linear-gradient(180deg, var(--surface-alt), var(--surface));
 }
 
@@ -526,7 +538,7 @@ textarea {
 .search-toolbar {
   justify-content: space-between;
   flex-wrap: wrap;
-  margin: 18px 0;
+  margin: 12px 0;
 }
 
 .filter-stack,
@@ -538,15 +550,18 @@ textarea {
 }
 
 .filter-select {
-  min-width: 180px;
+  min-width: 0;
+  width: 100%;
 }
 
 .date-range input {
-  min-width: 150px;
+  min-width: 0;
+  width: 100%;
 }
 
 .search-input {
-  flex: 1 1 260px;
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .wide-btn {
@@ -575,20 +590,21 @@ textarea {
 }
 
 .summary-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .summary-grid.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .summary-card {
   border-radius: 22px;
-  padding: 18px;
+  width: 100%;
+  padding: 12px;
 }
 
 .summary-card strong {
-  font-size: 1.8rem;
+  font-size: 1.35rem;
 }
 
 .summary-card.danger {
@@ -604,8 +620,9 @@ textarea {
 .bottom-sheet,
 .feature-list-card {
   border-radius: 24px;
-  padding: 18px;
-  margin-top: 18px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
   background: linear-gradient(180deg, var(--surface), var(--surface-alt));
 }
 
@@ -627,7 +644,8 @@ textarea {
 .detail-item-row {
   border-radius: 18px;
   border: 1px solid var(--line);
-  padding: 16px;
+  width: 100%;
+  padding: 12px;
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
 }
 
@@ -672,7 +690,7 @@ textarea {
 .inventory-meta,
 .ledger-meta {
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 
 .status-pill {
@@ -739,9 +757,9 @@ textarea {
 
 .detail-meta {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .line-items-panel {
@@ -750,8 +768,8 @@ textarea {
 
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .sheet-action {
@@ -771,7 +789,7 @@ textarea {
 }
 
 .workflow-line {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .workflow-step,
@@ -779,7 +797,8 @@ textarea {
 .settings-card,
 .worker-row {
   border-radius: 18px;
-  padding: 16px;
+  width: 100%;
+  padding: 12px;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
 }
@@ -795,7 +814,7 @@ textarea {
 }
 
 .settings-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .settings-card p {
@@ -839,13 +858,14 @@ textarea {
 
 .fab-stack {
   position: sticky;
-  bottom: 18px;
+  bottom: 12px;
   justify-content: flex-end;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .fab {
-  padding: 16px 20px;
+  width: 100%;
+  padding: 14px 16px;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: var(--inverse-text);
@@ -869,19 +889,20 @@ textarea {
 }
 
 .entry-modal .modal-shell {
-  width: min(520px, calc(100vw - 24px));
+  width: calc(100vw - 24px);
   border-radius: 28px;
-  padding: 22px;
+  max-width: 100%;
+  padding: 12px;
   background: linear-gradient(180deg, var(--surface), var(--surface-alt));
 }
 
 .invoice-shell,
 .product-sheet-shell {
-  width: min(760px, calc(100vw - 24px));
+  width: calc(100vw - 24px);
 }
 
 .customer-ledger-shell {
-  width: min(860px, calc(100vw - 24px));
+  width: calc(100vw - 24px);
 }
 
 .customer-ledger-shell,
@@ -913,7 +934,8 @@ textarea {
 .sheet-insights {
   border: 1px solid var(--line);
   border-radius: 20px;
-  padding: 16px;
+  width: 100%;
+  padding: 12px;
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
   color: var(--text-primary);
 }
@@ -935,10 +957,9 @@ textarea {
 }
 
 .invoice-head-card {
-  display: flex;
+  display: grid;
   gap: 12px;
-  justify-content: space-between;
-  align-items: center;
+  grid-template-columns: 1fr;
   margin-bottom: 16px;
 }
 
@@ -956,7 +977,7 @@ textarea {
 
 .invoice-totals {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
   align-items: center;
 }
@@ -1061,39 +1082,119 @@ textarea {
 
 .draft-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
-@media (max-width: 1024px) {
-  .auth-screen {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-grid.three,
-  .workflow-line,
-  .settings-grid,
-  .detail-meta {
-    grid-template-columns: 1fr;
-  }
+.app-header,
+.row-top,
+.row-bottom,
+.inventory-top,
+.inventory-bottom,
+.ledger-main,
+.worker-main,
+.worker-actions,
+.section-inline,
+.detail-top,
+.toolbar-row,
+.search-toolbar,
+.modal-top,
+.modal-actions {
+  flex-direction: column;
+  align-items: stretch;
 }
 
-@media (max-width: 760px) {
+.main-tabs,
+.inner-tabs,
+.chip-row,
+.date-range {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.header-actions > .icon-btn,
+.header-actions > .sync-badge,
+.settings-wrap > .icon-btn,
+.toolbar-row > *,
+.search-toolbar > *,
+.modal-actions > *,
+.detail-top-actions > *,
+.worker-actions > * {
+  width: 100%;
+}
+
+.screen-panel,
+.list-card,
+.detail-card,
+.bottom-sheet,
+.feature-list-card,
+.summary-card,
+.context-card,
+.invoice-row,
+.inventory-row,
+.ledger-row,
+.detail-item-row,
+.invoice-head-card,
+.invoice-sticky-footer,
+.invoice-composer-card,
+.sheet-insights,
+.worker-row,
+.settings-card,
+.role-card,
+.workflow-step {
+  min-width: 0;
+}
+
+@media (min-width: 761px) {
   .mobile-shell {
-    padding: 14px;
+    max-width: 1320px;
+    padding: 18px;
   }
 
-  .screen-panel,
+  .auth-screen {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 18px;
+  }
+
+  .auth-brand,
   .auth-card,
-  .auth-brand {
-    padding: 18px;
+  .screen-panel,
+  .list-card,
+  .detail-card,
+  .bottom-sheet,
+  .feature-list-card,
+  .summary-card,
+  .context-card,
+  .workflow-step,
+  .role-card,
+  .settings-card,
+  .worker-row,
+  .invoice-row,
+  .inventory-row,
+  .ledger-row,
+  .detail-item-row,
+  .entry-modal .modal-shell,
+  .invoice-head-card,
+  .invoice-sticky-footer,
+  .invoice-composer-card,
+  .sheet-insights {
+    padding: 16px;
   }
 
   .context-strip,
   .summary-grid.two,
+  .action-grid,
+  .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .summary-grid.three,
-  .action-grid {
-    grid-template-columns: 1fr;
+  .workflow-line {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .detail-meta {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .app-header,
@@ -1110,26 +1211,80 @@ textarea {
   .search-toolbar,
   .modal-top,
   .modal-actions {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .header-actions {
+    width: auto;
+  }
+
+  .settings-wrap {
+    width: auto;
   }
 
   .main-tabs,
   .inner-tabs,
   .chip-row,
   .date-range {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .settings-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: auto;
+    min-width: 220px;
+  }
+
+  .header-actions > .icon-btn,
+  .header-actions > .sync-badge,
+  .settings-wrap > .icon-btn,
+  .toolbar-row > *,
+  .search-toolbar > *,
+  .modal-actions > *,
+  .detail-top-actions > *,
+  .worker-actions > * {
+    width: auto;
+  }
+
+  .fab {
+    width: auto;
+  }
+
+  .entry-modal .modal-shell {
+    width: min(560px, calc(100vw - 48px));
+  }
+
+  .invoice-shell,
+  .product-sheet-shell {
+    width: min(760px, calc(100vw - 48px));
+  }
+
+  .customer-ledger-shell {
+    width: min(860px, calc(100vw - 48px));
+  }
+
+  .invoice-head-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .invoice-totals {
+    grid-template-columns: 1fr auto 1fr;
   }
 
   .draft-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 110px;
   }
+}
 
-  .invoice-head-card,
-  .invoice-totals,
-  .draft-item-row {
-    grid-template-columns: 1fr;
-    display: grid;
+@media (min-width: 1025px) {
+  .auth-screen {
+    grid-template-columns: 1.2fr 0.9fr;
+    gap: 24px;
   }
 }
