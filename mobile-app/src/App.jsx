@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "https://billing-backend-2v0w.onrender.com/api"
-).replace(/\/$/, "");
+const apiOrigin = (import.meta.env.VITE_API_URL || "https://billing-backend-2v0w.onrender.com").replace(/\/$/, "");
+const API_BASE_URL = apiOrigin.endsWith("/api") ? apiOrigin : `${apiOrigin}/api`;
 const TOKEN_KEY = "billr_web_token";
 const SESSION_KEY = "billr_web_session";
 const REQUEST_TIMEOUT_MS = 15000;

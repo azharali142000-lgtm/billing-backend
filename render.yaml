@@ -27,3 +27,6 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     autoDeploy: true
+    envVars:
+      - key: VITE_API_URL
+        value: https://billing-backend-2v0w.onrender.com
