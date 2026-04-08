@@ -165,8 +165,6 @@ let invoiceDraftBaseline = null;
 let suppressHistoryPush = false;
 let allowBrowserExit = false;
 let pendingCompanyLogoDataUrl = "";
-let printerInitialized = false;
-let printerScanListener = null;
 let invoiceDraft = {
   invoiceId: null,
   customerId: null,
@@ -286,7 +284,7 @@ function getCapacitorPlatform() {
 }
 
 function getNativePrinterPlugin() {
-  return window.Capacitor?.Plugins?.BluetoothLe || null;
+  return window.Capacitor?.Plugins?.NativeBluetoothPrinter || null;
 }
 
 function isNativeAndroidPrinterAvailable() {
@@ -314,125 +312,39 @@ async function ensureNativePrinterReady() {
   if (!plugin) {
     throw new Error("Bluetooth printing is only available inside the Android APK");
   }
-
-  if (!printerInitialized) {
-    await plugin.initialize({ androidNeverForLocation: true });
-    printerInitialized = true;
+  const status = await plugin.getStatus();
+  if (!status.available) {
+    throw new Error("Bluetooth is not available on this Android device.");
   }
-
-  const enabled = await plugin.isEnabled();
-  if (!enabled.value && plugin.requestEnable) {
-    await plugin.requestEnable();
+  if (status.enabled === false) {
+    throw new Error("Turn on Bluetooth on your phone, then try printing again.");
   }
-
   return plugin;
 }
 
 async function connectSavedPrinter(savedPrinter) {
   const plugin = await ensureNativePrinterReady();
-  if (!savedPrinter?.deviceId) {
+  if (!savedPrinter?.address) {
     return false;
   }
 
   try {
-    try {
-      await plugin.disconnect({ deviceId: savedPrinter.deviceId });
-    } catch (_error) {
-      // Ignore disconnect errors before reconnecting.
-    }
-    await plugin.connect({ deviceId: savedPrinter.deviceId, timeout: 12000 });
-    state.printer.connected = true;
-    state.printer.savedPrinter = savedPrinter;
-    setSavedPrinterPreference(savedPrinter);
-    return true;
+    const result = await plugin.connect({ address: savedPrinter.address });
+    state.printer.connected = Boolean(result.connected);
+    state.printer.savedPrinter = result.savedPrinter || savedPrinter;
+    setSavedPrinterPreference(state.printer.savedPrinter);
+    return state.printer.connected;
   } catch (error) {
     state.printer.connected = false;
-    console.log("[Billr] printer connect failed", { message: error.message, deviceId: savedPrinter.deviceId });
+    console.log("[Billr] printer connect failed", { message: error.message, address: savedPrinter.address });
     return false;
   }
 }
 
-async function scanNearbyBlePrinters() {
+async function listPairedPrinters() {
   const plugin = await ensureNativePrinterReady();
-  const devices = new Map();
-
-  if (!printerScanListener) {
-    printerScanListener = await plugin.addListener("onScanResult", (result) => {
-      const device = result?.device;
-      if (!device?.deviceId) {
-        return;
-      }
-      devices.set(device.deviceId, {
-        deviceId: device.deviceId,
-        name: result.localName || device.name || "Bluetooth Printer"
-      });
-    });
-  }
-
-  await plugin.requestLEScan({
-    allowDuplicates: false,
-    scanMode: 2
-  });
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-  await plugin.stopLEScan();
-
-  if (plugin.getBondedDevices) {
-    try {
-      const bonded = await plugin.getBondedDevices();
-      (bonded.devices || []).forEach((device) => {
-        if (device?.deviceId) {
-          devices.set(device.deviceId, {
-            deviceId: device.deviceId,
-            name: device.name || "Bluetooth Printer"
-          });
-        }
-      });
-    } catch (_error) {
-      // Bonded devices are optional.
-    }
-  }
-
-  return [...devices.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-}
-
-async function resolvePrinterEndpoint(deviceId) {
-  const plugin = await ensureNativePrinterReady();
-  const servicesResponse = await plugin.getServices({ deviceId });
-  const services = servicesResponse.services || [];
-  const candidates = [
-    ["0000ffe0-0000-1000-8000-00805f9b34fb", "0000ffe1-0000-1000-8000-00805f9b34fb"],
-    ["49535343-fe7d-4ae5-8fa9-9fafd205e455", "49535343-8841-43f4-a8d4-ecbe34729bb3"],
-    ["e7810a71-73ae-499d-8c15-faa9aef0c3f2", "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"]
-  ];
-
-  for (const [serviceUuid, characteristicUuid] of candidates) {
-    const service = services.find((entry) => entry.uuid?.toLowerCase() === serviceUuid);
-    const characteristic = service?.characteristics?.find(
-      (entry) => entry.uuid?.toLowerCase() === characteristicUuid
-    );
-    if (characteristic) {
-      return {
-        service: service.uuid,
-        characteristic: characteristic.uuid,
-        withoutResponse: characteristic.properties?.writeWithoutResponse ?? true
-      };
-    }
-  }
-
-  for (const service of services) {
-    const characteristic = (service.characteristics || []).find(
-      (entry) => entry.properties?.writeWithoutResponse || entry.properties?.write
-    );
-    if (characteristic) {
-      return {
-        service: service.uuid,
-        characteristic: characteristic.uuid,
-        withoutResponse: Boolean(characteristic.properties?.writeWithoutResponse)
-      };
-    }
-  }
-
-  throw new Error("No writable BLE printer characteristic was found on the selected device.");
+  const response = await plugin.listPairedDevices();
+  return (response.devices || []).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 }
 
 async function refreshNativePrinterState({ scan = false, reconnect = false } = {}) {
@@ -448,22 +360,23 @@ async function refreshNativePrinterState({ scan = false, reconnect = false } = {
     return state.printer;
   }
 
-  await ensureNativePrinterReady();
   const savedPrinter = getSavedPrinterPreference();
-  const pairedDevices = scan ? await scanNearbyBlePrinters() : state.printer.pairedDevices || [];
+  const plugin = await ensureNativePrinterReady();
+  const status = await plugin.getStatus();
+  const pairedDevices = scan ? await listPairedPrinters() : state.printer.pairedDevices || [];
   let connected = false;
 
-  if (reconnect && savedPrinter?.deviceId) {
+  if (reconnect && savedPrinter?.address) {
     connected = await connectSavedPrinter(savedPrinter);
-  } else if (savedPrinter?.deviceId && state.printer.connected) {
-    connected = true;
+  } else {
+    connected = Boolean(status.connected && savedPrinter?.address && status.savedPrinter?.address === savedPrinter.address);
   }
 
   state.printer = {
-    available: true,
+    available: Boolean(status.available),
     platform: getCapacitorPlatform(),
     connected,
-    savedPrinter,
+    savedPrinter: connected ? status.savedPrinter || savedPrinter : savedPrinter,
     pairedDevices
   };
 
@@ -473,7 +386,7 @@ async function refreshNativePrinterState({ scan = false, reconnect = false } = {
 
 async function saveNativePrinter(device) {
   const savedPrinter = {
-    deviceId: device.deviceId,
+    address: device.address,
     name: device.name || "Bluetooth Printer"
   };
   setSavedPrinterPreference(savedPrinter);
@@ -483,9 +396,9 @@ async function saveNativePrinter(device) {
 
 async function clearNativePrinterSelection() {
   const plugin = getNativePrinterPlugin();
-  if (plugin && state.printer.savedPrinter?.deviceId) {
+  if (plugin && state.printer.savedPrinter?.address) {
     try {
-      await plugin.disconnect({ deviceId: state.printer.savedPrinter.deviceId });
+      await plugin.disconnect();
     } catch (_error) {
       // Ignore disconnect issues during clear.
     }
@@ -494,6 +407,14 @@ async function clearNativePrinterSelection() {
   state.printer.savedPrinter = null;
   state.printer.connected = false;
   await refreshNativePrinterState({ scan: true });
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
 }
 
 function currency(value) {
@@ -1344,43 +1265,83 @@ async function printInvoiceViaNativeBluetooth(invoice) {
 
   const plugin = await ensureNativePrinterReady();
   const savedPrinter = state.printer.savedPrinter || getSavedPrinterPreference();
-  if (!savedPrinter?.deviceId) {
-    throw new Error("No printer selected. Choose a BLE printer in Settings first.");
+  if (!savedPrinter?.address) {
+    throw new Error("No printer selected. Choose a paired printer first.");
   }
 
-  const connected = await connectSavedPrinter(savedPrinter);
-  if (!connected) {
-    throw new Error("Unable to connect to the saved BLE printer.");
-  }
+  const payload = bytesToBase64(buildEscPosBytes(invoice));
+  const result = await plugin.printEscPos({
+    address: savedPrinter.address,
+    payloadBase64: payload
+  });
 
-  const endpoint = await resolvePrinterEndpoint(savedPrinter.deviceId);
-  const payload = buildEscPosBytes(invoice);
-  for (let offset = 0; offset < payload.length; offset += 180) {
-    const chunk = payload.slice(offset, offset + 180);
-    const value = new DataView(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
-    if (endpoint.withoutResponse) {
-      await plugin.writeWithoutResponse({
-        deviceId: savedPrinter.deviceId,
-        service: endpoint.service,
-        characteristic: endpoint.characteristic,
-        value
-      });
-    } else {
-      await plugin.write({
-        deviceId: savedPrinter.deviceId,
-        service: endpoint.service,
-        characteristic: endpoint.characteristic,
-        value
-      });
-    }
-  }
-
-  state.printer.connected = true;
-  state.printer.savedPrinter = savedPrinter;
+  state.printer.connected = Boolean(result.connected);
+  state.printer.savedPrinter = result.savedPrinter || savedPrinter;
   renderSettingsScreen();
   console.log("[Billr] thermal print success", {
     bytes: payload.length,
-    printer: savedPrinter.deviceId
+    printer: state.printer.savedPrinter?.address || savedPrinter.address
+  });
+}
+
+async function openPrinterSelectionModal(invoice) {
+  await refreshNativePrinterState({ scan: true });
+  if (!state.printer.pairedDevices.length) {
+    showMessage("No paired Bluetooth printers found. Pair the printer in Android settings first.", true);
+    return;
+  }
+
+  modalLabel.textContent = "Printer";
+  modalTitle.textContent = "Select Paired Printer";
+  modalFields.innerHTML = `
+    <div class="worker-list">
+      ${state.printer.pairedDevices
+        .map(
+          (device) => `
+            <article class="worker-row${state.printer.savedPrinter?.address === device.address ? " active-printer" : ""}">
+              <div class="worker-main">
+                <div class="ledger-left">
+                  <span class="avatar">${initials(device.name || "BT")}</span>
+                  <div>
+                    <div class="ledger-name">${escapeHtml(device.name || "Bluetooth Printer")}</div>
+                    <div class="ledger-meta">${escapeHtml(device.address)}</div>
+                  </div>
+                </div>
+                <div class="worker-actions">
+                  <button class="primary-btn" data-printer-pick="${escapeHtml(device.address)}" data-printer-name="${escapeHtml(device.name || "Bluetooth Printer")}" type="button">
+                    ${state.printer.savedPrinter?.address === device.address ? "Print Now" : "Use & Print"}
+                  </button>
+                </div>
+              </div>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+    <p class="support-text">Billing stays synced to the cloud. Printing happens directly over Android Bluetooth Classic.</p>
+  `;
+  modalSubmitBtn.classList.add("hidden");
+  modalSubmitHandler = null;
+  entryModal.showModal();
+
+  modalFields.querySelectorAll("[data-printer-pick]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        button.disabled = true;
+        const device = {
+          address: button.dataset.printerPick,
+          name: button.dataset.printerName
+        };
+        await saveNativePrinter(device);
+        await printInvoiceViaNativeBluetooth(invoice);
+        entryModal.close();
+        showMessage("Receipt sent to the Bluetooth printer.");
+      } catch (error) {
+        showMessage(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
   });
 }
 
@@ -1519,14 +1480,13 @@ async function handleInvoiceAction(action) {
   if (action === "thermal-print") {
     if (isNativeAndroidPrinterAvailable()) {
       try {
-        await printInvoiceViaNativeBluetooth(invoice);
-        showMessage("Thermal print sent to the saved Bluetooth printer.");
+        await openPrinterSelectionModal(invoice);
       } catch (error) {
         console.log("[Billr] thermal print failure", { message: error.message });
         showMessage(error.message, true);
       }
     } else {
-      showMessage("Bluetooth printing is only available inside the Android APK.", true);
+      showMessage("Thermal printing is available only inside the Android APK.", true);
     }
     return;
   }
@@ -1707,19 +1667,19 @@ function renderSettingsScreen() {
       printerStatusText.textContent =
         getCapacitorPlatform() === "android"
           ? "Native printer plugin is unavailable in this build."
-          : "Bluetooth printing is available in the Android APK. Web uses PDF preview.";
+          : "Thermal printing is available only inside the Android APK.";
     } else if (state.printer.connected) {
       printerStatusText.textContent = "Printer connected and ready for thermal printing.";
     } else if (state.printer.savedPrinter) {
       printerStatusText.textContent = "Saved printer found. Tap Reconnect or print an invoice to connect.";
     } else {
-      printerStatusText.textContent = "No printer selected yet. Scan nearby BLE devices and choose one.";
+      printerStatusText.textContent = "No printer selected yet. Load paired printers and choose one.";
     }
   }
 
   if (printerSavedText) {
     printerSavedText.textContent = state.printer.savedPrinter
-      ? `Saved printer: ${state.printer.savedPrinter.name || "Thermal Printer"} (${state.printer.savedPrinter.deviceId})`
+      ? `Saved printer: ${state.printer.savedPrinter.name || "Thermal Printer"} (${state.printer.savedPrinter.address})`
       : "No printer selected.";
   }
 
@@ -1737,23 +1697,23 @@ function renderSettingsScreen() {
     if (!isNativeAndroidPrinterAvailable()) {
       printerDeviceList.innerHTML = `<article class="worker-row"><div class="ledger-name">Open the Android APK to manage Bluetooth printers.</div></article>`;
     } else if (!state.printer.pairedDevices.length) {
-      printerDeviceList.innerHTML = `<article class="worker-row"><div class="ledger-name">No nearby BLE devices loaded yet. Tap "Scan Nearby Devices".</div></article>`;
+      printerDeviceList.innerHTML = `<article class="worker-row"><div class="ledger-name">No paired printers loaded yet. Tap "Load Paired Printers".</div></article>`;
     } else {
       printerDeviceList.innerHTML = state.printer.pairedDevices
         .map(
           (device) => `
-            <article class="worker-row${state.printer.savedPrinter?.deviceId === device.deviceId ? " active-printer" : ""}">
+            <article class="worker-row${state.printer.savedPrinter?.address === device.address ? " active-printer" : ""}">
               <div class="worker-main">
                 <div class="ledger-left">
                   <span class="avatar">${initials(device.name || "BT")}</span>
                   <div>
                     <div class="ledger-name">${device.name || "Bluetooth Printer"}</div>
-                    <div class="ledger-meta">${device.deviceId}</div>
+                    <div class="ledger-meta">${device.address}</div>
                   </div>
                 </div>
                 <div class="worker-actions">
-                  <button class="chip chip-ghost" data-printer-action="select" data-printer-device-id="${device.deviceId}" data-printer-name="${escapeHtml(device.name || "Bluetooth Printer")}" type="button">
-                    ${state.printer.savedPrinter?.deviceId === device.deviceId ? "Selected" : "Use Printer"}
+                  <button class="chip chip-ghost" data-printer-action="select" data-printer-address="${device.address}" data-printer-name="${escapeHtml(device.name || "Bluetooth Printer")}" type="button">
+                    ${state.printer.savedPrinter?.address === device.address ? "Selected" : "Use Printer"}
                   </button>
                 </div>
               </div>
@@ -1766,7 +1726,7 @@ function renderSettingsScreen() {
         button.addEventListener("click", async () => {
           try {
             await saveNativePrinter({
-              deviceId: button.dataset.printerDeviceId,
+              address: button.dataset.printerAddress,
               name: button.dataset.printerName
             });
             showMessage("Printer saved and connected.");
@@ -2447,6 +2407,7 @@ function openModal(type, meta = {}) {
   modalLabel.textContent = config.label;
   modalTitle.textContent = config.title;
   modalFields.innerHTML = modalFieldHtml(type, meta);
+  modalSubmitBtn.classList.remove("hidden");
   modalSubmitHandler = async () => {
     try {
       if (type === "invoice") {
@@ -2579,6 +2540,7 @@ function openModal(type, meta = {}) {
 }
 
 function closeModal() {
+  modalSubmitBtn.classList.remove("hidden");
   entryModal.close();
 }
 
@@ -2797,7 +2759,7 @@ printerScanBtn?.addEventListener("click", async () => {
   logClick("printer-scan");
   try {
     await refreshNativePrinterState({ scan: true });
-    showMessage("Paired Bluetooth devices loaded.");
+    showMessage("Paired Bluetooth printers loaded.");
   } catch (error) {
     showMessage(error.message, true);
   }
