@@ -4,8 +4,8 @@ services:
     env: node
     plan: starter
     rootDir: .
-    buildCommand: npm install && npm run prisma:generate && cd mobile-app && npm install && npm run build && cd .. && rm -rf dist && cp -R mobile-app/dist ./dist
-    startCommand: npx prisma migrate deploy && node server.js
+    buildCommand: npm run build
+    startCommand: npm start
     autoDeploy: true
     envVars:
       - key: NODE_ENV
