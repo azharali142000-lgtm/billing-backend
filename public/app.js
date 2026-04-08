@@ -1270,7 +1270,7 @@ async function printInvoiceViaNativeBluetooth(invoice) {
   }
 
   const payload = bytesToBase64(buildEscPosBytes(invoice));
-  const result = await plugin.printEscPos({
+  const result = await plugin.print({
     address: savedPrinter.address,
     payloadBase64: payload
   });
