@@ -4,7 +4,7 @@ services:
     env: node
     plan: starter
     rootDir: .
-    buildCommand: npm install && npm run prisma:generate
+    buildCommand: npm install && npm run prisma:generate && cd mobile-app && npm install && npm run build && cd .. && rm -rf dist && cp -R mobile-app/dist ./dist
     startCommand: npx prisma migrate deploy && node server.js
     autoDeploy: true
     envVars:
@@ -20,13 +20,5 @@ services:
         value: https://api.billr.example
       - key: CORS_ORIGINS
         value: https://app.billr.example
-  - type: web
-    name: billr-frontend
-    env: static
-    rootDir: mobile-app
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    autoDeploy: true
-    envVars:
       - key: VITE_API_URL
         value: https://billing-backend-2v0w.onrender.com

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
 
 const env = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -15,6 +16,7 @@ const companyRoutes = require("./routes/companyRoutes");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
+const distPath = path.join(__dirname, "..", "dist");
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || env.corsOrigins.includes("*") || env.corsOrigins.includes(origin)) {
@@ -47,6 +49,14 @@ app.use("/api/products", productRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/settings", settingsRoutes);
+
+app.use(express.static(distPath));
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
+  res.sendFile(path.join(distPath, "index.html"));
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);
