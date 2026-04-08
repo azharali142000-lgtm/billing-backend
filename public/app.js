@@ -284,7 +284,7 @@ function getCapacitorPlatform() {
 }
 
 function getNativePrinterPlugin() {
-  return window.Capacitor?.Plugins?.NativeBluetoothPrinter || null;
+  return window.Capacitor?.Plugins?.NativeBluetoothPrinterPlugin || null;
 }
 
 function isNativeAndroidPrinterAvailable() {
@@ -1284,6 +1284,10 @@ async function printInvoiceViaNativeBluetooth(invoice) {
   });
 }
 
+async function printThermal(invoice) {
+  return printInvoiceViaNativeBluetooth(invoice);
+}
+
 async function openPrinterSelectionModal(invoice) {
   await refreshNativePrinterState({ scan: true });
   if (!state.printer.pairedDevices.length) {
@@ -1333,7 +1337,7 @@ async function openPrinterSelectionModal(invoice) {
           name: button.dataset.printerName
         };
         await saveNativePrinter(device);
-        await printInvoiceViaNativeBluetooth(invoice);
+        await printThermal(invoice);
         entryModal.close();
         showMessage("Receipt sent to the Bluetooth printer.");
       } catch (error) {

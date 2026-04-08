@@ -19,11 +19,12 @@ import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;
 
 @CapacitorPlugin(
-    name = "NativeBluetoothPrinter",
+    name = "NativeBluetoothPrinterPlugin",
     permissions = {
         @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT })
     }
@@ -136,11 +137,12 @@ public class NativeBluetoothPrinterPlugin extends Plugin {
         }
         String address = call.getString("address");
         String payloadBase64 = call.getString("payloadBase64");
+        String text = call.getString("text");
         if (address == null || address.trim().isEmpty()) {
             call.reject("Printer address is required.");
             return;
         }
-        if (payloadBase64 == null || payloadBase64.isEmpty()) {
+        if ((payloadBase64 == null || payloadBase64.isEmpty()) && (text == null || text.isEmpty())) {
             call.reject("Print payload is required.");
             return;
         }
@@ -152,7 +154,9 @@ public class NativeBluetoothPrinterPlugin extends Plugin {
                     connectToDevice(device);
                 }
 
-                byte[] payload = Base64.decode(payloadBase64, Base64.DEFAULT);
+                byte[] payload = payloadBase64 != null && !payloadBase64.isEmpty()
+                    ? Base64.decode(payloadBase64, Base64.DEFAULT)
+                    : text.getBytes(StandardCharsets.UTF_8);
                 if (activeOutputStream == null) {
                     throw new IOException("Printer output stream is not available.");
                 }
@@ -163,6 +167,11 @@ public class NativeBluetoothPrinterPlugin extends Plugin {
                 call.reject(error.getMessage(), error);
             }
         });
+    }
+
+    @PluginMethod
+    public void print(PluginCall call) {
+        printEscPos(call);
     }
 
     @PermissionCallback
