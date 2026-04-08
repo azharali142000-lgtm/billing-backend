@@ -12,9 +12,12 @@ const {
 const { buildInvoicePdf } = require("../utils/invoicePdf");
 const { serializeInvoice } = require("../utils/serializers");
 
-async function getInvoiceWithRelations(invoiceId) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
+async function getInvoiceWithRelations(invoiceId, companyId) {
+  const invoice = await prisma.invoice.findFirst({
+    where: {
+      id: invoiceId,
+      companyId
+    },
     include: {
       customer: true,
       user: true,
@@ -95,9 +98,12 @@ const createInvoice = asyncHandler(async (req, res) => {
   const normalizedItems = normalizeInvoiceItems(items);
 
   const invoice = await prisma.$transaction(async (tx) => {
-    const settings = await getOrCreateGstSettings(tx);
-    const customer = await tx.customer.findUnique({
-      where: { id: Number(customerId) }
+    const settings = await getOrCreateGstSettings(tx, req.user.companyId);
+    const customer = await tx.customer.findFirst({
+      where: {
+        id: Number(customerId),
+        companyId: req.user.companyId
+      }
     });
 
     if (!customer) {
@@ -113,6 +119,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     const productIds = [...aggregatedItems.keys()];
     const products = await tx.product.findMany({
       where: {
+        companyId: req.user.companyId,
         id: { in: productIds }
       }
     });
@@ -153,6 +160,7 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     const createdInvoice = await tx.invoice.create({
       data: {
+        companyId: req.user.companyId,
         customerId: customer.id,
         userId: req.user.id,
         subtotal,
@@ -223,9 +231,12 @@ const updateInvoice = asyncHandler(async (req, res) => {
   const normalizedItems = normalizeInvoiceItems(items);
 
   const updatedInvoice = await prisma.$transaction(async (tx) => {
-    const settings = await getOrCreateGstSettings(tx);
-    const existingInvoice = await tx.invoice.findUnique({
-      where: { id: invoiceId },
+    const settings = await getOrCreateGstSettings(tx, req.user.companyId);
+    const existingInvoice = await tx.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        companyId: req.user.companyId
+      },
       include: {
         customer: true,
         items: true
@@ -240,8 +251,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Cancelled invoices cannot be edited");
     }
 
-    const nextCustomer = await tx.customer.findUnique({
-      where: { id: Number(customerId) }
+    const nextCustomer = await tx.customer.findFirst({
+      where: {
+        id: Number(customerId),
+        companyId: req.user.companyId
+      }
     });
 
     if (!nextCustomer) {
@@ -256,6 +270,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
     const productIds = [...aggregatedItems.keys()];
     const products = await tx.product.findMany({
       where: {
+        companyId: req.user.companyId,
         id: { in: productIds }
       }
     });
@@ -341,6 +356,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
     return tx.invoice.update({
       where: { id: invoiceId },
       data: {
+        companyId: req.user.companyId,
         customerId: nextCustomer.id,
         subtotal,
         gstApplied: taxSummary.gstApplied,
@@ -380,8 +396,11 @@ const cancelInvoice = asyncHandler(async (req, res) => {
   }
 
   const invoice = await prisma.$transaction(async (tx) => {
-    const existing = await tx.invoice.findUnique({
-      where: { id: invoiceId },
+    const existing = await tx.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        companyId: req.user.companyId
+      },
       include: {
         items: true,
         customer: true
@@ -450,8 +469,8 @@ module.exports = {
       throw new ApiError(400, "Valid invoice id is required");
     }
 
-    const invoice = await getInvoiceWithRelations(invoiceId);
-    const companyProfile = await prisma.$transaction(async (tx) => getOrCreateCompanyProfile(tx));
+    const invoice = await getInvoiceWithRelations(invoiceId, req.user.companyId);
+    const companyProfile = await prisma.$transaction(async (tx) => getOrCreateCompanyProfile(tx, req.company));
     const pdfBuffer = buildInvoicePdf(invoice, companyProfile);
 
     res.setHeader("Content-Type", "application/pdf");
@@ -472,6 +491,7 @@ module.exports = {
     }
 
     const where = {
+      companyId: req.user.companyId,
       ...(Number.isInteger(customerId) ? { customerId } : {}),
       ...(createdAt ? { createdAt } : {})
     };

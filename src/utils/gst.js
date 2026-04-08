@@ -1,8 +1,8 @@
 const { Prisma } = require("@prisma/client");
 
-async function getOrCreateGstSettings(tx) {
+async function getOrCreateGstSettings(tx, companyId) {
   const existing = await tx.gstSettings.findUnique({
-    where: { id: 1 }
+    where: { companyId }
   });
 
   if (existing) {
@@ -10,7 +10,7 @@ async function getOrCreateGstSettings(tx) {
   }
 
   return tx.gstSettings.create({
-    data: { id: 1 }
+    data: { companyId }
   });
 }
 

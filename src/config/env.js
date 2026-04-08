@@ -17,7 +17,7 @@ module.exports = {
   apiBaseUrl: process.env.API_BASE_URL || "https://api.billr.example",
   corsOrigins: String(
     process.env.CORS_ORIGINS ||
-      "http://localhost:4000,http://localhost:3000,https://app.billr.example"
+      "*,http://localhost:4000,http://localhost:3000,https://app.billr.example"
   )
     .split(",")
     .map((origin) => origin.trim())

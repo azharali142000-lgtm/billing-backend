@@ -9,7 +9,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  WORKER
+  STAFF
 }
 
 enum InvoiceStatus {
@@ -28,20 +28,49 @@ enum GstType {
   IGST
 }
 
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
+model Company {
+  id                 Int                @id @default(autoincrement())
+  name               String
+  subscriptionStatus SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  expiryDate         DateTime           @map("expiry_date")
+  maxAdmins          Int                @default(2) @map("max_admins")
+  users              User[]
+  customers          Customer[]
+  products           Product[]
+  invoices           Invoice[]
+  payments           Payment[]
+  gstSettings        GstSettings?
+  companyProfile     CompanyProfile?
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
 model User {
   id            Int            @id @default(autoincrement())
   name          String
-  phone         String?        @unique
-  email         String?        @unique
-  firebaseUid   String?        @unique @map("firebase_uid")
-  passwordHash  String?        @map("password_hash")
+  email         String
+  phone         String?
+  companyId     Int            @map("company_id")
+  passwordHash  String         @map("password_hash")
   role          UserRole
   isActive      Boolean        @default(true) @map("is_active")
-  invoices     Invoice[]
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices      Invoice[]
   refreshTokens RefreshToken[]
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
+  @@unique([companyId, email])
+  @@unique([companyId, phone])
+  @@index([companyId])
   @@map("users")
 }
 
@@ -62,36 +91,45 @@ model RefreshToken {
 }
 
 model Customer {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
+  companyId   Int      @map("company_id")
   name        String
-  phone       String?   @unique
+  phone       String?
   address     String?
-  gstSelected Boolean   @default(false) @map("gst_selected")
-  balance     Decimal   @db.Decimal(12, 2) @default(0)
-  creditLimit Decimal   @map("credit_limit") @db.Decimal(12, 2) @default(0)
+  gstSelected Boolean  @default(false) @map("gst_selected")
+  balance     Decimal  @db.Decimal(12, 2) @default(0)
+  creditLimit Decimal  @map("credit_limit") @db.Decimal(12, 2) @default(0)
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices    Invoice[]
   payments    Payment[]
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@unique([companyId, phone])
+  @@index([companyId])
   @@map("customers")
 }
 
 model Product {
   id        Int           @id @default(autoincrement())
+  companyId Int           @map("company_id")
   name      String?
+  unit      String?
   price     Decimal       @db.Decimal(12, 2)
   gstRate   Decimal?      @map("gst_rate") @db.Decimal(5, 2)
   stock     Int           @default(0)
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items     InvoiceItem[]
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
+  @@index([companyId])
   @@map("products")
 }
 
 model Invoice {
   id         Int           @id @default(autoincrement())
+  companyId   Int          @map("company_id")
   customerId Int           @map("customer_id")
   userId     Int           @map("user_id")
   subtotal   Decimal       @db.Decimal(12, 2) @default(0)
@@ -102,15 +140,17 @@ model Invoice {
   gstNumber  String?       @map("gst_number")
   total      Decimal       @db.Decimal(12, 2)
   status     InvoiceStatus @default(PENDING)
-  createdAt  DateTime      @default(now()) @map("created_at")
-  updatedAt  DateTime      @updatedAt @map("updated_at")
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer   Customer      @relation(fields: [customerId], references: [id])
   user       User          @relation(fields: [userId], references: [id])
   items      InvoiceItem[]
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
 
+  @@index([companyId])
   @@index([createdAt])
   @@index([customerId])
-  @@index([customerId, createdAt])
+  @@index([companyId, customerId, createdAt])
   @@map("invoices")
 }
 
@@ -129,22 +169,27 @@ model InvoiceItem {
 
 model Payment {
   id         Int      @id @default(autoincrement())
+  companyId  Int      @map("company_id")
   customerId Int      @map("customer_id")
   amount     Decimal  @db.Decimal(12, 2)
   method     String
-  createdAt  DateTime @default(now()) @map("created_at")
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer   Customer @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([companyId])
   @@map("payments")
 }
 
 model GstSettings {
-  id             Int      @id @default(1)
+  id             Int      @id @default(autoincrement())
+  companyId      Int      @unique @map("company_id")
   gstEnabled     Boolean  @default(false) @map("gst_enabled")
   gstMode        GstMode  @default(ALL) @map("gst_mode")
   defaultGstRate Decimal  @default(18) @map("default_gst_rate") @db.Decimal(5, 2)
   gstNumber      String?  @map("gst_number")
   gstType        GstType  @default(CGST_SGST) @map("gst_type")
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -152,8 +197,9 @@ model GstSettings {
 }
 
 model CompanyProfile {
-  id                 Int      @id @default(1)
-  companyName        String   @map("company_name") @default("Billr Cloud")
+  id                 Int      @id @default(autoincrement())
+  companyId          Int      @unique @map("company_id")
+  companyName        String   @map("company_name")
   logoDataUrl        String?  @map("logo_data_url")
   address            String?  @db.Text
   phone              String?
@@ -161,6 +207,7 @@ model CompanyProfile {
   gstNumber          String?  @map("gst_number")
   bankDetails        String?  @map("bank_details") @db.Text
   termsAndConditions String?  @map("terms_and_conditions") @db.Text
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

@@ -5,8 +5,8 @@ const { getOrCreateCompanyProfile } = require("../utils/companyProfile");
 const { getOrCreateGstSettings } = require("../utils/gst");
 const { serializeCompanyProfile, serializeGstSettings } = require("../utils/serializers");
 
-const getGstSettings = asyncHandler(async (_req, res) => {
-  const settings = await prisma.$transaction(async (tx) => getOrCreateGstSettings(tx));
+const getGstSettings = asyncHandler(async (req, res) => {
+  const settings = await prisma.$transaction(async (tx) => getOrCreateGstSettings(tx, req.user.companyId));
 
   res.json({
     success: true,
@@ -14,8 +14,8 @@ const getGstSettings = asyncHandler(async (_req, res) => {
   });
 });
 
-const getCompanyProfile = asyncHandler(async (_req, res) => {
-  const profile = await prisma.$transaction(async (tx) => getOrCreateCompanyProfile(tx));
+const getCompanyProfile = asyncHandler(async (req, res) => {
+  const profile = await prisma.$transaction(async (tx) => getOrCreateCompanyProfile(tx, req.company));
 
   res.json({
     success: true,
@@ -44,10 +44,16 @@ const updateCompanyProfile = asyncHandler(async (req, res) => {
   }
 
   const profile = await prisma.$transaction(async (tx) => {
-    await getOrCreateCompanyProfile(tx);
+    await getOrCreateCompanyProfile(tx, req.company);
+    await tx.company.update({
+      where: { id: req.user.companyId },
+      data: {
+        name: String(companyName).trim()
+      }
+    });
 
     return tx.companyProfile.update({
-      where: { id: 1 },
+      where: { companyId: req.user.companyId },
       data: {
         companyName: String(companyName).trim(),
         logoDataUrl: logoDataUrl ? String(logoDataUrl) : null,
@@ -91,9 +97,12 @@ const updateGstSettings = asyncHandler(async (req, res) => {
     : [];
 
   const settings = await prisma.$transaction(async (tx) => {
-    await getOrCreateGstSettings(tx);
+    await getOrCreateGstSettings(tx, req.user.companyId);
 
     await tx.customer.updateMany({
+      where: {
+        companyId: req.user.companyId
+      },
       data: {
         gstSelected: false
       }
@@ -102,6 +111,7 @@ const updateGstSettings = asyncHandler(async (req, res) => {
     if (normalizedCustomerIds.length) {
       await tx.customer.updateMany({
         where: {
+          companyId: req.user.companyId,
           id: { in: normalizedCustomerIds }
         },
         data: {
@@ -111,7 +121,7 @@ const updateGstSettings = asyncHandler(async (req, res) => {
     }
 
     return tx.gstSettings.update({
-      where: { id: 1 },
+      where: { companyId: req.user.companyId },
       data: {
         gstEnabled: Boolean(gstEnabled),
         gstMode: String(gstMode).toUpperCase(),

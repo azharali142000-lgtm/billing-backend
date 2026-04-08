@@ -1,6 +1,6 @@
-async function getOrCreateCompanyProfile(tx) {
+async function getOrCreateCompanyProfile(tx, company) {
   const existing = await tx.companyProfile.findUnique({
-    where: { id: 1 }
+    where: { companyId: company.id }
   });
 
   if (existing) {
@@ -9,8 +9,8 @@ async function getOrCreateCompanyProfile(tx) {
 
   return tx.companyProfile.create({
     data: {
-      id: 1,
-      companyName: "Billr Cloud"
+      companyId: company.id,
+      companyName: company.name
     }
   });
 }
