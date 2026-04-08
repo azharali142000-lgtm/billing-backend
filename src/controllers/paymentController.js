@@ -24,8 +24,11 @@ const recordPayment = asyncHandler(async (req, res) => {
   }
 
   const payment = await prisma.$transaction(async (tx) => {
-    const customer = await tx.customer.findUnique({
-      where: { id: Number(customerId) }
+    const customer = await tx.customer.findFirst({
+      where: {
+        id: Number(customerId),
+        companyId: req.user.companyId
+      }
     });
 
     if (!customer) {
@@ -38,6 +41,7 @@ const recordPayment = asyncHandler(async (req, res) => {
 
     const createdPayment = await tx.payment.create({
       data: {
+        companyId: req.user.companyId,
         customerId: customer.id,
         amount: normalizedAmount,
         method: String(method).trim()
@@ -64,8 +68,11 @@ const recordPayment = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listPayments: asyncHandler(async (_req, res) => {
+  listPayments: asyncHandler(async (req, res) => {
     const payments = await prisma.payment.findMany({
+      where: {
+        companyId: req.user.companyId
+      },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: {

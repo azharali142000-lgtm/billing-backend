@@ -1,8 +1,6 @@
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 
 const prisma = require("../lib/prisma");
-const { verifyFirebaseIdToken } = require("../lib/firebaseAdmin");
 const env = require("../config/env");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -12,18 +10,14 @@ const {
   hashRefreshToken,
   signAccessToken
 } = require("../utils/auth");
-const { serializeUser } = require("../utils/serializers");
+const { serializeCompany, serializeUser } = require("../utils/serializers");
 
 function normalizeRole(role) {
-  if (!role) {
-    return null;
+  const normalized = String(role || "STAFF").trim().toUpperCase();
+  if (normalized === "WORKER") {
+    return "STAFF";
   }
-
-  const normalized = String(role).trim().toUpperCase();
-  if (normalized === "STAFF") {
-    return "WORKER";
-  }
-  return ["ADMIN", "WORKER"].includes(normalized) ? normalized : null;
+  return ["ADMIN", "STAFF"].includes(normalized) ? normalized : null;
 }
 
 async function issueSession(user, deviceName = null) {
@@ -45,9 +39,10 @@ async function issueSession(user, deviceName = null) {
   };
 }
 
-function buildAuthResponse(user, session) {
+function buildAuthResponse(user, company, session) {
   return {
     user: serializeUser(user),
+    company: serializeCompany(company),
     token: session.accessToken,
     accessToken: session.accessToken,
     refreshToken: session.refreshToken,
@@ -55,119 +50,136 @@ function buildAuthResponse(user, session) {
   };
 }
 
-const register = asyncHandler(async (req, res) => {
-  const { name, phone, email, password, role } = req.body;
+function trialExpiryDate() {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 14);
+  return expiresAt;
+}
 
-  if (!name || (!phone && !email) || !password) {
-    throw new ApiError(400, "name, phone or email, and password are required");
+async function ensureEmailAvailable(email, companyId = null) {
+  const existingUser = await prisma.user.findFirst({
+    where: companyId
+      ? { companyId, email }
+      : { email }
+  });
+
+  if (existingUser) {
+    throw new ApiError(409, "A user with this email already exists");
+  }
+}
+
+async function ensureAdminLimit(companyId, desiredRole) {
+  if (desiredRole !== "ADMIN") {
+    return;
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId }
+  });
+
+  const adminCount = await prisma.user.count({
+    where: {
+      companyId,
+      role: "ADMIN",
+      isActive: true
+    }
+  });
+
+  if (adminCount >= company.maxAdmins) {
+    throw new ApiError(400, `This company can have only ${company.maxAdmins} admins`);
+  }
+}
+
+const register = asyncHandler(async (req, res) => {
+  const { companyName, name, email, password, phone, deviceName } = req.body;
+
+  if (!companyName || !name || !email || !password) {
+    throw new ApiError(400, "companyName, name, email, and password are required");
   }
 
   if (String(password).length < 6) {
     throw new ApiError(400, "password must be at least 6 characters long");
   }
 
-  const desiredRole = normalizeRole(role || "WORKER");
-  if (!desiredRole) {
-    throw new ApiError(400, "role must be either admin or staff");
-  }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  await ensureEmailAvailable(normalizedEmail);
 
-  const userCount = await prisma.user.count();
-
-  if (userCount > 0) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new ApiError(401, "Only admins can create additional users");
-    }
-
-    const token = authHeader.split(" ")[1];
-    let payload;
-    try {
-      payload = jwt.verify(token, env.jwtSecret);
-    } catch (_error) {
-      throw new ApiError(401, "Invalid or expired token");
-    }
-
-    const currentUser = await prisma.user.findUnique({
-      where: { id: Number(payload.sub) }
+  const { company, user } = await prisma.$transaction(async (tx) => {
+    const createdCompany = await tx.company.create({
+      data: {
+        name: String(companyName).trim(),
+        subscriptionStatus: "TRIAL",
+        expiryDate: trialExpiryDate()
+      }
     });
 
-    if (!currentUser || currentUser.role !== "ADMIN") {
-      throw new ApiError(403, "Only admins can create additional users");
-    }
-  } else if (desiredRole !== "ADMIN") {
-    throw new ApiError(400, "The first registered user must have admin role");
-  }
-
-  if (phone) {
-    const existingPhoneUser = await prisma.user.findUnique({
-      where: { phone: String(phone).trim() }
+    await tx.gstSettings.create({
+      data: {
+        companyId: createdCompany.id
+      }
     });
-    if (existingPhoneUser) {
-      throw new ApiError(409, "A user with this phone already exists");
-    }
-  }
 
-  if (email) {
-    const existingEmailUser = await prisma.user.findUnique({
-      where: { email: String(email).trim().toLowerCase() }
+    await tx.companyProfile.create({
+      data: {
+        companyId: createdCompany.id,
+        companyName: String(companyName).trim()
+      }
     });
-    if (existingEmailUser) {
-      throw new ApiError(409, "A user with this email already exists");
-    }
-  }
 
-  const user = await prisma.user.create({
-    data: {
-      name: String(name).trim(),
-      phone: phone ? String(phone).trim() : null,
-      email: email ? String(email).trim().toLowerCase() : null,
-      passwordHash: await bcrypt.hash(password, env.bcryptSaltRounds),
-      role: desiredRole
-    }
+    const createdUser = await tx.user.create({
+      data: {
+        name: String(name).trim(),
+        email: normalizedEmail,
+        phone: phone ? String(phone).trim() : null,
+        passwordHash: await bcrypt.hash(password, env.bcryptSaltRounds),
+        companyId: createdCompany.id,
+        role: "ADMIN"
+      }
+    });
+
+    return {
+      company: createdCompany,
+      user: createdUser
+    };
   });
 
-  const session = await issueSession(user, req.body.deviceName);
+  const session = await issueSession(user, deviceName);
 
   res.status(201).json({
     success: true,
-    message: "User registered successfully",
-    data: buildAuthResponse(user, session)
+    message: "Company and admin account created successfully",
+    data: buildAuthResponse(user, company, session)
   });
 });
 
 const login = asyncHandler(async (req, res) => {
-  const { identifier, phone, email, password, deviceName } = req.body;
-  const normalizedIdentifier = String(identifier || phone || email || "").trim();
+  const { email, identifier, password, deviceName } = req.body;
+  const normalizedEmail = String(email || identifier || "").trim().toLowerCase();
 
-  if (!normalizedIdentifier || !password) {
-    throw new ApiError(400, "phone/email and password are required");
+  if (!normalizedEmail || !password) {
+    throw new ApiError(400, "email and password are required");
   }
 
   const user = await prisma.user.findFirst({
     where: {
-      OR: [
-        { phone: normalizedIdentifier },
-        { email: normalizedIdentifier.toLowerCase() }
-      ]
+      email: normalizedEmail
+    },
+    include: {
+      company: true
     }
   });
 
   if (!user) {
-    throw new ApiError(401, "Invalid login ID or password");
+    throw new ApiError(404, "User not found. Create a company account first.");
   }
 
   if (!user.isActive) {
     throw new ApiError(403, "This user account is disabled");
   }
 
-  if (!user.passwordHash) {
-    throw new ApiError(401, "This account uses OTP login. Use Firebase phone verification.");
-  }
-
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-
   if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid login ID or password");
+    throw new ApiError(401, "Invalid email or password");
   }
 
   const session = await issueSession(user, deviceName);
@@ -175,68 +187,7 @@ const login = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: "Login successful",
-    data: buildAuthResponse(user, session)
-  });
-});
-
-const firebaseLogin = asyncHandler(async (req, res) => {
-  const { idToken, name, deviceName } = req.body;
-
-  if (!idToken) {
-    throw new ApiError(400, "idToken is required");
-  }
-
-  let decodedToken;
-  try {
-    decodedToken = await verifyFirebaseIdToken(idToken);
-  } catch (_error) {
-    throw new ApiError(401, "Invalid Firebase ID token");
-  }
-
-  const phone = decodedToken.phone_number ? String(decodedToken.phone_number).trim() : null;
-  if (!phone) {
-    throw new ApiError(400, "Firebase token must include a verified phone number");
-  }
-
-  let user = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { firebaseUid: decodedToken.uid },
-        { phone }
-      ]
-    }
-  });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        name: String(name || decodedToken.name || phone).trim(),
-        phone,
-        firebaseUid: decodedToken.uid,
-        role: "WORKER"
-      }
-    });
-  } else {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        firebaseUid: decodedToken.uid,
-        phone,
-        name: user.name || String(name || decodedToken.name || phone).trim()
-      }
-    });
-  }
-
-  if (!user.isActive) {
-    throw new ApiError(403, "This user account is disabled");
-  }
-
-  const session = await issueSession(user, deviceName || "Firebase OTP");
-
-  res.json({
-    success: true,
-    message: "Firebase login successful",
-    data: buildAuthResponse(user, session)
+    data: buildAuthResponse(user, user.company, session)
   });
 });
 
@@ -252,7 +203,11 @@ const refreshSession = asyncHandler(async (req, res) => {
       tokenHash: hashRefreshToken(refreshToken)
     },
     include: {
-      user: true
+      user: {
+        include: {
+          company: true
+        }
+      }
     }
   });
 
@@ -276,7 +231,7 @@ const refreshSession = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: "Session refreshed successfully",
-    data: buildAuthResponse(existing.user, session)
+    data: buildAuthResponse(existing.user, existing.user.company, session)
   });
 });
 
@@ -303,12 +258,18 @@ const logout = asyncHandler(async (req, res) => {
 
 const me = asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
-    where: { id: req.user.id }
+    where: { id: req.user.id },
+    include: {
+      company: true
+    }
   });
 
   res.json({
     success: true,
-    data: serializeUser(user)
+    data: {
+      user: serializeUser(user),
+      company: serializeCompany(user.company)
+    }
   });
 });
 
@@ -331,9 +292,6 @@ const changePassword = asyncHandler(async (req, res) => {
     where: { id: req.user.id }
   });
 
-  if (!user.passwordHash) {
-    throw new ApiError(400, "This account uses OTP login and does not support password change");
-  }
   const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isCurrentPasswordValid) {
     throw new ApiError(400, "Current password is incorrect");
@@ -352,136 +310,65 @@ const changePassword = asyncHandler(async (req, res) => {
   });
 });
 
-const listWorkers = asyncHandler(async (_req, res) => {
-  const workers = await prisma.user.findMany({
-    where: { role: "WORKER" },
+const listUsers = asyncHandler(async (req, res) => {
+  const users = await prisma.user.findMany({
+    where: {
+      companyId: req.user.companyId
+    },
     orderBy: { createdAt: "desc" }
   });
 
   res.json({
     success: true,
-    data: workers.map(serializeUser)
+    data: users.map(serializeUser)
   });
 });
 
-const createWorker = asyncHandler(async (req, res) => {
-  const { name, phone, email, password } = req.body;
+const createUser = asyncHandler(async (req, res) => {
+  const { name, email, password, phone, role } = req.body;
 
-  if (!name || (!phone && !email) || !password) {
-    throw new ApiError(400, "name, phone or email, and password are required");
+  if (!name || !email || !password) {
+    throw new ApiError(400, "name, email, and password are required");
   }
 
   if (String(password).length < 6) {
     throw new ApiError(400, "password must be at least 6 characters long");
   }
 
-  if (phone) {
-    const existingPhoneUser = await prisma.user.findUnique({
-      where: { phone: String(phone).trim() }
-    });
-    if (existingPhoneUser) {
-      throw new ApiError(409, "A user with this phone already exists");
-    }
+  const desiredRole = normalizeRole(role || "STAFF");
+  if (!desiredRole) {
+    throw new ApiError(400, "role must be admin or staff");
   }
 
-  if (email) {
-    const existingEmailUser = await prisma.user.findUnique({
-      where: { email: String(email).trim().toLowerCase() }
-    });
-    if (existingEmailUser) {
-      throw new ApiError(409, "A user with this email already exists");
-    }
-  }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  await ensureEmailAvailable(normalizedEmail, req.user.companyId);
+  await ensureAdminLimit(req.user.companyId, desiredRole);
 
-  const worker = await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name: String(name).trim(),
+      email: normalizedEmail,
       phone: phone ? String(phone).trim() : null,
-      email: email ? String(email).trim().toLowerCase() : null,
       passwordHash: await bcrypt.hash(password, env.bcryptSaltRounds),
-      role: "WORKER"
+      companyId: req.user.companyId,
+      role: desiredRole
     }
   });
 
   res.status(201).json({
     success: true,
-    message: "Staff created successfully",
-    data: serializeUser(worker)
-  });
-});
-
-const resetWorkerPassword = asyncHandler(async (req, res) => {
-  const workerId = Number(req.params.id);
-  const { newPassword } = req.body;
-
-  if (!Number.isInteger(workerId) || !newPassword) {
-    throw new ApiError(400, "Valid staff id and newPassword are required");
-  }
-
-  if (String(newPassword).length < 6) {
-    throw new ApiError(400, "new password must be at least 6 characters long");
-  }
-
-  const worker = await prisma.user.findUnique({
-    where: { id: workerId }
-  });
-
-  if (!worker || worker.role !== "WORKER") {
-    throw new ApiError(404, "Staff not found");
-  }
-
-  await prisma.user.update({
-    where: { id: workerId },
-    data: {
-      passwordHash: await bcrypt.hash(newPassword, env.bcryptSaltRounds)
-    }
-  });
-
-  res.json({
-    success: true,
-    message: "Staff password reset successfully"
-  });
-});
-
-const disableWorker = asyncHandler(async (req, res) => {
-  const workerId = Number(req.params.id);
-
-  if (!Number.isInteger(workerId)) {
-    throw new ApiError(400, "Valid staff id is required");
-  }
-
-  const worker = await prisma.user.findUnique({
-    where: { id: workerId }
-  });
-
-  if (!worker || worker.role !== "WORKER") {
-    throw new ApiError(404, "Staff not found");
-  }
-
-  const updatedWorker = await prisma.user.update({
-    where: { id: workerId },
-    data: {
-      isActive: false
-    }
-  });
-
-  res.json({
-    success: true,
-    message: "Staff disabled successfully",
-    data: serializeUser(updatedWorker)
+    message: `${desiredRole === "ADMIN" ? "Admin" : "Staff"} created successfully`,
+    data: serializeUser(user)
   });
 });
 
 module.exports = {
   changePassword,
-  createWorker,
-  disableWorker,
-  firebaseLogin,
+  createUser,
+  listUsers,
   login,
-  listWorkers,
   logout,
   me,
   refreshSession,
-  resetWorkerPassword,
   register
 };

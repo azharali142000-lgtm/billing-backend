@@ -3,8 +3,11 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { serializeCustomer } = require("../utils/serializers");
 
-const listCustomers = asyncHandler(async (_req, res) => {
+const listCustomers = asyncHandler(async (req, res) => {
   const customers = await prisma.customer.findMany({
+    where: {
+      companyId: req.user.companyId
+    },
     orderBy: { createdAt: "desc" }
   });
 
@@ -24,8 +27,11 @@ const createCustomer = asyncHandler(async (req, res) => {
   const normalizedPhone = phone ? String(phone).trim() : null;
 
   if (normalizedPhone) {
-    const existingCustomer = await prisma.customer.findUnique({
-      where: { phone: normalizedPhone }
+    const existingCustomer = await prisma.customer.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        phone: normalizedPhone
+      }
     });
 
     if (existingCustomer) {
@@ -35,6 +41,7 @@ const createCustomer = asyncHandler(async (req, res) => {
 
   const customer = await prisma.customer.create({
     data: {
+      companyId: req.user.companyId,
       name: String(name).trim(),
       phone: normalizedPhone,
       address: address ? String(address).trim() : null,
@@ -65,15 +72,18 @@ const updateCustomer = asyncHandler(async (req, res) => {
     where: { id: customerId }
   });
 
-  if (!existing) {
+  if (!existing || existing.companyId !== req.user.companyId) {
     throw new ApiError(404, "Customer not found");
   }
 
   const normalizedPhone = phone ? String(phone).trim() : null;
 
   if (normalizedPhone) {
-    const phoneOwner = await prisma.customer.findUnique({
-      where: { phone: normalizedPhone }
+    const phoneOwner = await prisma.customer.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        phone: normalizedPhone
+      }
     });
 
     if (phoneOwner && phoneOwner.id !== customerId) {

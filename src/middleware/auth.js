@@ -22,7 +22,10 @@ const authenticate = asyncHandler(async (req, _res, next) => {
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: Number(payload.sub) }
+    where: { id: Number(payload.sub) },
+    include: {
+      company: true
+    }
   });
 
   if (!user) {
@@ -34,9 +37,11 @@ const authenticate = asyncHandler(async (req, _res, next) => {
     name: user.name,
     phone: user.phone,
     email: user.email,
+    companyId: user.companyId,
     isActive: user.isActive,
     role: user.role
   };
+  req.company = user.company;
 
   if (!user.isActive) {
     throw new ApiError(403, "This user account is disabled");

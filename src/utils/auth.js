@@ -6,8 +6,10 @@ function signAccessToken(user) {
   return jwt.sign(
     {
       sub: user.id,
+      user_id: user.id,
+      company_id: user.companyId,
       role: user.role,
-      phone: user.phone
+      email: user.email
     },
     env.jwtSecret,
     {

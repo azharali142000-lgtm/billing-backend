@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
-const path = require("path");
 
 const env = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -11,6 +10,8 @@ const productRoutes = require("./routes/productRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const userRoutes = require("./routes/userRoutes");
+const companyRoutes = require("./routes/companyRoutes");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -33,17 +34,14 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("combined"));
-app.use(express.static(path.join(__dirname, "..", "public")));
-
-app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
-});
 
 app.get("/health", (_req, res) => {
   res.json({ success: true, message: "Server is healthy" });
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/company", companyRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/invoices", invoiceRoutes);

@@ -1,21 +1,28 @@
 {
-  "name": "billr-capacitor-shell",
+  "name": "billr-mobile-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Android APK shell that loads the live Billr frontend URL",
+  "description": "Bundled React + Capacitor billing app for Billr",
   "scripts": {
-    "sync": "cap sync android",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "copy:android": "cap copy android",
     "open:android": "cap open android",
-    "build:android": "cap sync android && cap open android"
+    "sync:android": "cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/core": "^7.0.0",
-    "@capacitor/network": "^7.0.0"
+    "@capacitor/network": "^7.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.0",
-    "typescript": "^5.6.3"
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8"
   }
 }

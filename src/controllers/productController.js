@@ -3,8 +3,11 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { serializeProduct } = require("../utils/serializers");
 
-const listProducts = asyncHandler(async (_req, res) => {
+const listProducts = asyncHandler(async (req, res) => {
   const products = await prisma.product.findMany({
+    where: {
+      companyId: req.user.companyId
+    },
     orderBy: { createdAt: "desc" }
   });
 
@@ -42,7 +45,9 @@ const createProduct = asyncHandler(async (req, res) => {
 
   const product = await prisma.product.create({
     data: {
+      companyId: req.user.companyId,
       name: name ? String(name).trim() : null,
+      unit: req.body.unit ? String(req.body.unit).trim() : null,
       price: normalizedPrice,
       gstRate: normalizedGstRate,
       stock: normalizedStock
@@ -72,7 +77,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     where: { id: productId }
   });
 
-  if (!existing) {
+  if (!existing || existing.companyId !== req.user.companyId) {
     throw new ApiError(404, "Product not found");
   }
 
@@ -99,6 +104,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     where: { id: productId },
     data: {
       name: name ? String(name).trim() : null,
+      unit: req.body.unit === undefined ? existing.unit : req.body.unit ? String(req.body.unit).trim() : null,
       price: normalizedPrice,
       gstRate: normalizedGstRate,
       stock: normalizedStock

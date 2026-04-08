@@ -8,7 +8,7 @@ function authorize(...roles) {
 
     const normalizedRoles = roles.map((role) => {
       const normalized = String(role).toUpperCase();
-      return normalized === "STAFF" ? "WORKER" : normalized;
+      return normalized === "WORKER" ? "STAFF" : normalized;
     });
 
     if (!normalizedRoles.includes(req.user.role)) {

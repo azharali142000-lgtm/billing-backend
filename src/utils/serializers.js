@@ -5,6 +5,7 @@ function serializeUser(user) {
     name: user.name,
     phone: user.phone,
     email: user.email,
+    companyId: user.companyId,
     role: normalizedRole === "worker" ? "staff" : normalizedRole,
     isActive: user.isActive,
     createdAt: user.createdAt
@@ -14,6 +15,7 @@ function serializeUser(user) {
 function serializeCustomer(customer) {
   return {
     ...customer,
+    companyId: customer.companyId,
     balance: Number(customer.balance),
     creditLimit: Number(customer.creditLimit)
   };
@@ -22,6 +24,7 @@ function serializeCustomer(customer) {
 function serializeProduct(product) {
   return {
     ...product,
+    companyId: product.companyId,
     price: Number(product.price),
     gstRate: product.gstRate === null || product.gstRate === undefined ? null : Number(product.gstRate)
   };
@@ -59,6 +62,16 @@ function serializeCompanyProfile(profile) {
   };
 }
 
+function serializeCompany(company) {
+  return {
+    id: company.id,
+    name: company.name,
+    subscriptionStatus: String(company.subscriptionStatus || "").toLowerCase(),
+    expiryDate: company.expiryDate,
+    maxAdmins: company.maxAdmins
+  };
+}
+
 function serializePayment(payment) {
   return {
     ...payment,
@@ -69,6 +82,7 @@ function serializePayment(payment) {
 module.exports = {
   serializeCustomer,
   serializeCompanyProfile,
+  serializeCompany,
   serializeGstSettings,
   serializeInvoice,
   serializePayment,
