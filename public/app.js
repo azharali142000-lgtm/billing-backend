@@ -1285,6 +1285,10 @@ async function printInvoiceViaNativeBluetooth(invoice) {
 }
 
 async function printThermal(invoice) {
+  const plugin = window.Capacitor?.Plugins?.NativeBluetoothPrinterPlugin;
+  if (getCapacitorPlatform() !== "android" || !plugin) {
+    throw new Error("Printing not supported in this browser.");
+  }
   return printInvoiceViaNativeBluetooth(invoice);
 }
 
