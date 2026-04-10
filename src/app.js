@@ -4,6 +4,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const env = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -21,7 +22,58 @@ const distCandidates = [
   path.join(__dirname, "..", "dist"),
   path.join(__dirname, "..", "mobile-app", "dist")
 ];
-const distPath = distCandidates.find((candidate) => fs.existsSync(path.join(candidate, "index.html"))) || distCandidates[0];
+const rootDist = distCandidates[0];
+const mobileDist = distCandidates[1];
+const mobilePackageJson = path.join(__dirname, "..", "mobile-app", "package.json");
+
+function copyDir(source, target) {
+  if (fs.existsSync(target)) {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+  fs.cpSync(source, target, { recursive: true });
+}
+
+function ensureFrontendDist() {
+  const rootIndex = path.join(rootDist, "index.html");
+  const mobileIndex = path.join(mobileDist, "index.html");
+
+  if (fs.existsSync(rootIndex)) {
+    return rootDist;
+  }
+
+  if (fs.existsSync(mobileIndex)) {
+    copyDir(mobileDist, rootDist);
+    return rootDist;
+  }
+
+  if (!fs.existsSync(mobilePackageJson)) {
+    return rootDist;
+  }
+
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+  const installResult = spawnSync(npmCmd, ["--prefix", "mobile-app", "install"], {
+    cwd: path.join(__dirname, ".."),
+    stdio: "inherit"
+  });
+
+  if (installResult.status !== 0) {
+    return rootDist;
+  }
+
+  const buildResult = spawnSync(npmCmd, ["--prefix", "mobile-app", "run", "build"], {
+    cwd: path.join(__dirname, ".."),
+    stdio: "inherit"
+  });
+
+  if (buildResult.status !== 0 || !fs.existsSync(mobileIndex)) {
+    return rootDist;
+  }
+
+  copyDir(mobileDist, rootDist);
+  return rootDist;
+}
+
+const distPath = ensureFrontendDist();
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || env.corsOrigins.includes("*") || env.corsOrigins.includes(origin)) {
